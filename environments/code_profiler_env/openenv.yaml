@@ -1,0 +1,66 @@
+name: Code Profiler Environment
+version: 0.1.0
+description: OpenEnv environment for iterative code profiling and performance optimization
+
+environment:
+  type: code-profiling
+  language: python
+  
+  containers:
+    - name: python-env
+      language: python
+      port: 5000
+      profiler: austin
+      
+    - name: java-env
+      language: java
+      port: 8080
+      profiler: async-profiler
+      
+    - name: cpp-env
+      language: cpp
+      port: 8080
+      profiler: austin
+
+profilers:
+  python:
+    tool: austin
+    options:
+      duration: 5
+      output: profiles/python_{timestamp}.mojo
+      
+  java:
+    tool: async-profiler
+    options:
+      duration: 5
+      output: profiles/java_{timestamp}.html
+      
+  cpp:
+    tool: austin
+    options:
+      duration: 5
+      output: profiles/cpp_{timestamp}.prof
+
+endpoints:
+  - path: /catalog
+    method: GET
+    languages: [python, java, cpp]
+    
+  - path: /orders
+    method: POST
+    languages: [python, java, cpp]
+    
+  - path: /orders/{id}/status
+    method: GET
+    languages: [python, java, cpp]
+
+reward:
+  type: graded-percentage
+  scale: 0.5  # per 10% improvement
+  min: -2.0
+  max: 2.0
+  direction: lower-is-better
+
+iteration:
+  max: 4
+  mode: sequential

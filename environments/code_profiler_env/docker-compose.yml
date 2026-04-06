@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  code-profiler-openenv:
+    build:
+      context: ./code_profiler_env
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - profiler-network
+  code-profiler-env:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - PROFILING_ENABLED=true
+      - PYTHON_PROFILE=python
+      - JAVA_PROFILE=java
+      - CPP_PROFILE=cpp
+    volumes:
+      - ../../src:/app/src
+      - ../../profiles:/app/profiles
+      - ../../logs:/app/logs
+    networks:
+      - profiler-network
+
+  python-container:
+    build:
+      context: ./server/python
+      dockerfile: Dockerfile
+    environment:
+      - AUSTIN_ENABLED=true
+    volumes:
+      - ./python/src:/app/src
+      - ../../profiles:/app/profiles
+    networks:
+      - profiler-network
+
+  java-container:
+    build:
+      context: ./server/java
+      dockerfile: Dockerfile
+    environment:
+      - ASYNC_PROFILER_ENABLED=true
+    volumes:
+      - ./java/src:/app/src
+      - ../../profiles:/app/profiles
+    networks:
+      - profiler-network
+
+  cpp-container:
+    build:
+      context: ./server/cpp
+      dockerfile: Dockerfile
+    environment:
+      - AUSTIN_ENABLED=true
+    volumes:
+      - ./cpp/src:/app/src
+      - ../../profiles:/app/profiles
+    networks:
+      - profiler-network
+
+networks:
+  profiler-network:
+    driver: bridge

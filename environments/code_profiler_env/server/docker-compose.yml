@@ -1,0 +1,19 @@
+services:
+  code-profiler-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../../src:/app/src
+      - ../../profiles:/app/profiles
+      - ../../logs:/app/logs
+    networks:
+      - profiler-network
+
+networks:
+  profiler-network:
+    driver: bridge
