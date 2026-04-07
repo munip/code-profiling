@@ -2,9 +2,18 @@ from .models import (
     ProfileAction,
     ProfileObservation,
     ProfileState,
+    ProfileState,
     Hotspot,
     IterationResult,
     StepResult,
+    Task,
+    TaskDifficulty,
+    TaskType,
+    GradingCriteria,
+    GraderResult,
+    ResetResponse,
+    AVAILABLE_TASKS,
+    TASK_MAP,
 )
 from .client import CodeProfilerEnv
 
@@ -15,5 +24,13 @@ __all__ = [
     "Hotspot",
     "IterationResult",
     "StepResult",
+    "Task",
+    "TaskDifficulty",
+    "TaskType",
+    "GradingCriteria",
+    "GraderResult",
+    "ResetResponse",
+    "AVAILABLE_TASKS",
+    "TASK_MAP",
     "CodeProfilerEnv",
 ]

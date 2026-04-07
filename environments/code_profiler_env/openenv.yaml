@@ -1,26 +1,97 @@
 name: Code Profiler Environment
-version: 0.1.0
-description: OpenEnv environment for iterative code profiling and performance optimization
+version: 1.0.0
+description: OpenEnv environment for iterative code profiling and performance optimization. Agent learns to identify and fix performance bottlenecks in Python, Java, and C++ code.
 
 environment:
   type: code-profiling
+  framework: openenv
   language: python
-  
-  containers:
-    - name: python-env
-      language: python
-      port: 5000
-      profiler: austin
-      
-    - name: java-env
-      language: java
-      port: 8080
-      profiler: async-profiler
-      
-    - name: cpp-env
-      language: cpp
-      port: 8080
-      profiler: austin
+
+tasks:
+  - id: python-string-concat-easy
+    name: Fix String Concatenation (Python)
+    difficulty: easy
+    description: Fix string concatenation in loops causing slow responses. Optimize build_catalog_response function.
+    target_language: python
+    max_iterations: 3
+    grading:
+      type: normalized
+      scale: 0.0-1.0
+      criteria:
+        - metric: execution_time
+          target: 50.0ms
+          threshold: 80.0ms
+          weight: 0.7
+        - metric: improvement_percent
+          target: 50%
+          threshold: 20%
+          weight: 0.3
+    hints:
+      - "Use string join() or f-strings instead of + operator in loops"
+      - "Pre-allocate string builder if using manual concatenation"
+
+  - id: python-linear-search-medium
+    name: Fix Linear Search (Python)
+    difficulty: medium
+    description: Optimize O(n) linear search to O(1) hash lookup for product search.
+    target_language: python
+    max_iterations: 4
+    grading:
+      type: normalized
+      scale: 0.0-1.0
+      criteria:
+        - metric: execution_time
+          target: 30.0ms
+          threshold: 60.0ms
+          weight: 0.6
+        - metric: hotspot_reduction
+          target: 80%
+          threshold: 50%
+          weight: 0.4
+    hints:
+      - "Use a dictionary to cache products by ID"
+      - "Build index on first access, then O(1) lookups"
+
+  - id: cpp-memory-optimization-hard
+    name: Fix Memory Optimization (C++)
+    difficulty: hard
+    description: Optimize C++ implementation with memory allocation issues and excessive copies.
+    target_language: cpp
+    max_iterations: 5
+    grading:
+      type: normalized
+      scale: 0.0-1.0
+      criteria:
+        - metric: execution_time
+          target: 20.0ms
+          threshold: 40.0ms
+          weight: 0.4
+        - metric: memory_usage
+          target: 50.0MB
+          threshold: 100.0MB
+          weight: 0.4
+        - metric: hotspot_reduction
+          target: 70%
+          threshold: 40%
+          weight: 0.2
+    hints:
+      - "Use move semantics to avoid copies"
+      - "Pre-allocate vectors instead of push_back in loops"
+      - "Consider using string_view instead of string copies"
+
+containers:
+  - name: python-env
+    language: python
+    port: 5000
+    profiler: austin
+  - name: java-env
+    language: java
+    port: 8080
+    profiler: async-profiler
+  - name: cpp-env
+    language: cpp
+    port: 8080
+    profiler: austin
 
 profilers:
   python:
@@ -28,13 +99,11 @@ profilers:
     options:
       duration: 5
       output: profiles/python_{timestamp}.mojo
-      
   java:
     tool: async-profiler
     options:
       duration: 5
       output: profiles/java_{timestamp}.html
-      
   cpp:
     tool: austin
     options:
@@ -45,22 +114,38 @@ endpoints:
   - path: /catalog
     method: GET
     languages: [python, java, cpp]
-    
   - path: /orders
     method: POST
     languages: [python, java, cpp]
-    
   - path: /orders/{id}/status
     method: GET
     languages: [python, java, cpp]
 
 reward:
-  type: graded-percentage
-  scale: 0.5  # per 10% improvement
-  min: -2.0
-  max: 2.0
-  direction: lower-is-better
+  type: normalized-score
+  scale: 0.0-1.0
+  direction: higher-is-better
+  partial_progress: true
 
-iteration:
-  max: 4
-  mode: sequential
+api:
+  reset:
+    path: /reset
+    method: POST
+    params: [task_id, language]
+  step:
+    path: /step
+    method: POST
+    params: [action_type, language, iteration, code_fix]
+  state:
+    path: /state
+    method: GET
+  tasks:
+    path: /tasks
+    method: GET
+
+tags:
+  - code-profiling
+  - performance-optimization
+  - rl-environment
+  - openenv
+  - hackathon

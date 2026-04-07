@@ -19,6 +19,6 @@ COPY ./src /app/src
 ENV PYTHONUNBUFFERED=1
 ENV AUSTIN_ENABLED=true
 
-EXPOSE 5000
+EXPOSE 8080
 
-CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["sh", "-c", "cd /app/src && python app.py"]

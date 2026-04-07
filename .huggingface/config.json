@@ -1,0 +1,19 @@
+{
+  "title": "Code Profiler Environment",
+  "emoji": "⚡",
+  "colorFrom": "blue",
+  "colorTo": "green",
+  "sdk": "docker",
+  "app_port": 8000,
+  "dockerfile": "Dockerfile",
+  "tags": [
+    "openenv",
+    "code-profiling",
+    "performance-optimization",
+    "reinforcement-learning",
+    "rl-environment"
+  ],
+  "模型的": "code-profiling",
+  "short_description": "OpenEnv environment for iterative code profiling and performance optimization using RL agents.",
+  "type": "docker"
+}

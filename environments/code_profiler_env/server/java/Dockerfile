@@ -13,11 +13,11 @@ ENV PATH=$PATH:/opt/async-profiler
 
 COPY ./src /app/src
 
-RUN javac -d /app/classes /app/src/**/*.java
+RUN find /app/src -name "*.java" -exec javac -d /app/classes {} +
 
 ENV ASYNC_PROFILER_HOME=/opt/async-profiler
 ENV PROFILE_DURATION=5
 
 EXPOSE 8080
 
-CMD ["java", "-cp", "/app/classes", "com.ecommerce.api.ECommerceAPI"]
+CMD ["sh", "-c", "while true; do java -cp /app/classes com.ecommerce.api.ECommerceAPI; done"]

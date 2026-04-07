@@ -1,6 +1,6 @@
 """OpenEnv client for Code Profiler Environment."""
 
-from typing import Optional
+from typing import Optional, List
 from openenv import EnvClient
 
 from .models import (
@@ -8,6 +8,9 @@ from .models import (
     ProfileObservation,
     ProfileState,
     StepResult,
+    Task,
+    ResetResponse,
+    GraderResult,
 )
 
 
@@ -20,7 +23,7 @@ class CodeProfilerEnv(EnvClient):
 
     Example:
         with CodeProfilerEnv(base_url="http://localhost:8000") as client:
-            result = client.reset()
+            result = await client.reset()
             print(f"Initial state: {result.observation}")
 
             action = ProfileAction(
@@ -28,8 +31,8 @@ class CodeProfilerEnv(EnvClient):
                 language="python",
                 iteration=0
             )
-            result = client.step(action)
-            print(f"Reward: {result.observation.reward}")
+            result = await client.step(action)
+            print(f"Score: {result.observation.cumulative_score}")
     """
 
     def __init__(
@@ -46,30 +49,35 @@ class CodeProfilerEnv(EnvClient):
             **kwargs,
         )
 
-    async def reset(self, **kwargs) -> StepResult:
+    async def reset(self, task_id: Optional[str] = None, language: str = "python") -> ResetResponse:
         """Reset the environment and get initial observation."""
-        response = await self._post("/reset", json=kwargs)
+        response = await self._post("/reset", json={"task_id": task_id, "language": language})
         data = response.json()
-
-        observation = ProfileObservation(**data["observation"])
-        state = ProfileState(**data["state"])
-
-        return StepResult(observation=observation, state=state)
+        return ResetResponse(**data)
 
     async def step(self, action: ProfileAction) -> StepResult:
         """Take a step in the environment."""
         response = await self._post("/step", json=action.model_dump())
         data = response.json()
-
-        observation = ProfileObservation(**data["observation"])
-        state = ProfileState(**data["state"])
-
-        return StepResult(observation=observation, state=state)
+        return StepResult(**data)
 
     async def state(self) -> ProfileState:
         """Get current environment state."""
-        response = await self._post("/state", json={})
+        response = await self._get("/state")
         return ProfileState(**response.json())
+
+    async def get_tasks(self) -> List[Task]:
+        """Get all available tasks."""
+        response = await self._get("/tasks")
+        return [Task(**t) for t in response.json()]
+
+    async def get_task(self, task_id: str) -> Optional[Task]:
+        """Get a specific task."""
+        response = await self._get(f"/tasks/{task_id}")
+        data = response.json()
+        if "error" in data:
+            return None
+        return Task(**data)
 
     async def get_hotspots(self) -> list:
         """Get current hotspots from the last profile run."""

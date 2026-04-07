@@ -15,7 +15,7 @@ FROM alpine:3.19
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libstdc++ libatomic
 
 COPY --from=builder /build/build/ecommerce_api /app/
 
@@ -24,4 +24,4 @@ ENV PROFILE_DURATION=5
 
 EXPOSE 8080
 
-CMD ["./ecommerce_api"]
+CMD ["sh", "-c", "while true; do ./ecommerce_api; done"]
