@@ -86,6 +86,13 @@ class APIServerManager:
                 logger.info("Java API already running")
                 return True
 
+            java_class = "/app/java_classes/com/ecommerce/api/ECommerceAPI.class"
+            if not os.path.exists(java_class):
+                logger.error(f"Java class not found: {java_class}")
+                return False
+
+            logger.info(f"Java class found at: {java_class}")
+
             self.java_server.process = subprocess.Popen(
                 ["java", "-cp", "/app/server/java/src:/app/java_classes", JAVA_MAIN_CLASS],
                 stdout=subprocess.PIPE,
@@ -93,14 +100,18 @@ class APIServerManager:
                 preexec_fn=os.setsid if os.name != "nt" else None,
             )
 
-            if self._wait_for_server(self.java_server.port, timeout=10):
-                self.java_server.running = True
-                logger.info(f"Java API started on port {JAVA_API_PORT}")
-                return True
-            else:
-                logger.warning("Java API may not be running (non-HTTP server)")
-                self.java_server.running = True
-                return True
+            time.sleep(2)
+            poll = self.java_server.process.poll()
+            if poll is not None:
+                stdout, stderr = self.java_server.process.communicate()
+                logger.error(f"Java process exited immediately with code {poll}")
+                logger.error(f"stdout: {stdout.decode() if stdout else ''}")
+                logger.error(f"stderr: {stderr.decode() if stderr else ''}")
+                return False
+
+            self.java_server.running = True
+            logger.info(f"Java API started on port {JAVA_API_PORT}")
+            return True
         except Exception as e:
             logger.error(f"Error starting Java API: {e}")
             return False
@@ -116,6 +127,8 @@ class APIServerManager:
                 logger.error(f"C++ binary not found: {CPP_BINARY}")
                 return False
 
+            logger.info(f"C++ binary found at: {CPP_BINARY}")
+
             self.cpp_server.process = subprocess.Popen(
                 [CPP_BINARY],
                 stdout=subprocess.PIPE,
@@ -123,14 +136,18 @@ class APIServerManager:
                 preexec_fn=os.setsid if os.name != "nt" else None,
             )
 
-            if self._wait_for_server(self.cpp_server.port, timeout=10):
-                self.cpp_server.running = True
-                logger.info(f"C++ API started on port {CPP_API_PORT}")
-                return True
-            else:
-                logger.warning("C++ API may not be running (non-HTTP server)")
-                self.cpp_server.running = True
-                return True
+            time.sleep(2)
+            poll = self.cpp_server.process.poll()
+            if poll is not None:
+                stdout, stderr = self.cpp_server.process.communicate()
+                logger.error(f"C++ process exited immediately with code {poll}")
+                logger.error(f"stdout: {stdout.decode() if stdout else ''}")
+                logger.error(f"stderr: {stderr.decode() if stderr else ''}")
+                return False
+
+            self.cpp_server.running = True
+            logger.info(f"C++ API started on port {CPP_API_PORT}")
+            return True
         except Exception as e:
             logger.error(f"Error starting C++ API: {e}")
             return False

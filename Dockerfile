@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=2
+ARG BUILD_VERSION=3
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -63,10 +63,29 @@ COPY environments/code_profiler_env/templates/java/ECommerceAPI.java /app/server
 COPY environments/code_profiler_env/templates/cpp/main.cpp /app/server/cpp/src/main.cpp
 
 # Compile Java (needs to be run from src/ to match package structure)
-RUN cd /app/server/java/src && javac -d /app/java_classes com/ecommerce/api/ECommerceAPI.java || echo "Java compilation skipped"
+RUN cd /app/server/java/src && javac -d /app/java_classes com/ecommerce/api/ECommerceAPI.java && \
+    echo "Java compiled successfully" || echo "Java compilation failed"
+
+# Verify Java class file exists
+RUN if [ -f /app/java_classes/com/ecommerce/api/ECommerceAPI.class ]; then \
+        echo "Java class file verified: /app/java_classes/com/ecommerce/api/ECommerceAPI.class"; \
+    else \
+        echo "ERROR: Java class file NOT found!"; \
+        exit 1; \
+    fi
 
 # Compile C++
-RUN g++ -O0 -o /app/server/cpp/build/ecommerce_api /app/server/cpp/src/main.cpp || echo "C++ compilation skipped"
+RUN g++ -O0 -o /app/server/cpp/build/ecommerce_api /app/server/cpp/src/main.cpp && \
+    echo "C++ compiled successfully" || echo "C++ compilation failed"
+
+# Verify C++ binary exists
+RUN if [ -f /app/server/cpp/build/ecommerce_api ]; then \
+        echo "C++ binary verified: /app/server/cpp/build/ecommerce_api"; \
+        ls -la /app/server/cpp/build/ecommerce_api; \
+    else \
+        echo "ERROR: C++ binary NOT found!"; \
+        exit 1; \
+    fi
 
 EXPOSE 7860
 
