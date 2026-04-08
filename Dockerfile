@@ -28,21 +28,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # This avoids network issues during Docker build in HF Spaces
 RUN printf '#!/bin/bash\n\
 mkdir -p /tmp/async-profiler\n\
-if [ ! -f /tmp/async-profiler/profiler.sh ]; then\n\
-    echo "Downloading async-profiler..."\n\
+if [ ! -f /tmp/async-profiler/bin/asprof ]; then\n\
+    echo "Downloading async-profiler v4.3..."\n\
     ARCH=$(uname -m)\n\
     if [ "$ARCH" = "aarch64" ]; then\n\
-        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz\n\
+        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-arm64.tar.gz\n\
     else\n\
-        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz\n\
+        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-x64.tar.gz\n\
     fi\n\
     tar -xzf /tmp/profiler.tar.gz -C /tmp && mv /tmp/async-profiler-* /tmp/async-profiler && rm /tmp/profiler.tar.gz\n\
+    # Create profiler.sh wrapper if missing (v4.3 removed it)\n\
+    if [ ! -f /tmp/async-profiler/profiler.sh ] && [ -f /tmp/async-profiler/bin/asprof ]; then\n\
+        echo "#!/bin/bash" > /tmp/async-profiler/profiler.sh\n\
+        echo "exec /tmp/async-profiler/bin/asprof \"\$@\"" >> /tmp/async-profiler/profiler.sh\n\
+        chmod +x /tmp/async-profiler/profiler.sh\n\
+    fi\n\
     echo "async-profiler downloaded"\n\
 fi\n\
 if [ ! -f /usr/local/bin/austin ]; then\n\
     echo "Downloading austin..."\n\
     wget -q -O /tmp/austin.tar.xz https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz\n\
-    tar -xf /tmp/austin.tar.xz -C /tmp && mv /tmp/austin-*/austin /usr/local/bin/austin && chmod +x /usr/local/bin/austin && rm -rf /tmp/austin*\n\
+    tar -xJf /tmp/austin.tar.xz -C /tmp && mv /tmp/austin-*/austin /usr/local/bin/austin && chmod +x /usr/local/bin/austin && rm -rf /tmp/austin*\n\
     echo "austin downloaded"\n\
 fi\n\
 exec "$@"\n' > /startup.sh && chmod +x /startup.sh

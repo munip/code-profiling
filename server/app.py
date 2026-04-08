@@ -283,9 +283,9 @@ async def startup_event():
                 ["uname", "-m"], capture_output=True, text=True
             ).stdout.strip()
             if arch == "aarch64":
-                url = "https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz"
+                url = "https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-arm64.tar.gz"
             else:
-                url = "https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz"
+                url = "https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-x64.tar.gz"
             Path("/tmp").mkdir(exist_ok=True)
             urllib.request.urlretrieve(url, "/tmp/profiler.tar.gz")
             subprocess.run(
