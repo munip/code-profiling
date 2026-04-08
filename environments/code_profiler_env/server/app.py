@@ -4,6 +4,7 @@ import sys
 import logging
 import asyncio
 import random
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -47,6 +48,17 @@ from rl_components import (
     OutcomeDeterminer,
 )
 from report_generator import ReportGenerator, create_episode_report, IterationRecord
+
+try:
+    from .start_apis import api_manager, start_apis_on_boot
+    from .profile_runner import ProfileRunner
+
+    APIS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Could not import API modules: {e}")
+    APIS_AVAILABLE = False
+    api_manager = None
+    ProfileRunner = None
 
 
 class PerformanceGrader:
@@ -228,6 +240,33 @@ previous_time_ms = 0.0
 previous_memory_mb = 0.0
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Start all API servers on startup."""
+    if APIS_AVAILABLE and api_manager:
+        logger.info("Starting API servers...")
+        try:
+            results = api_manager.start_all()
+            for name, success in results.items():
+                status = "OK" if success else "FAILED"
+                logger.info(f"  {name.upper()} API: {status}")
+        except Exception as e:
+            logger.error(f"Failed to start APIs: {e}")
+    else:
+        logger.info("API modules not available, using simulated profiling")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop all API servers on shutdown."""
+    if APIS_AVAILABLE and api_manager:
+        logger.info("Stopping API servers...")
+        try:
+            api_manager.stop_all()
+        except Exception as e:
+            logger.error(f"Failed to stop APIs: {e}")
+
+
 def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetResponse:
     """Reset the environment for a specific task or random task."""
     global state, previous_time_ms, previous_memory_mb
@@ -283,6 +322,69 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
     )
 
     return ResetResponse(observation=observation, state=state, available_tasks=AVAILABLE_TASKS)
+
+
+def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
+    """Generate simulated profiling data as fallback."""
+    performance_multipliers = {
+        TaskType.STRING_CONCATENATION: [1.0, 0.65, 0.45, 0.35, 0.30],
+        TaskType.LINEAR_SEARCH: [1.0, 0.70, 0.50, 0.40, 0.35],
+        TaskType.MEMORY_OPTIMIZATION: [1.0, 0.75, 0.55, 0.45, 0.35, 0.30],
+    }
+
+    multipliers = performance_multipliers.get(state.current_task.task_type, [1.0] * 6)
+    idx = min(state.current_iteration, len(multipliers) - 1)
+    multiplier = multipliers[idx]
+
+    execution_time_ms = state.baseline_performance_ms * multiplier
+
+    file_map = {
+        "python": ("app.py", 45, 78, 112),
+        "java": ("ECommerceAPI.java", 75, 84, 98),
+        "cpp": ("main.cpp", 55, 64, 75),
+    }
+
+    func_map = {
+        "python": ("build_catalog_response", "find_product_by_id_linear", "calculate_order_total"),
+        "java": ("buildCatalogResponse", "findProductLinear", "calculateOrderTotal"),
+        "cpp": ("build_catalog_response", "find_product_linear", "calculate_order_total"),
+    }
+
+    lang = language.lower()[:2]
+    base_file, line1, line2, line3 = file_map.get(lang, file_map["python"])
+    funcs = func_map.get(lang, func_map["python"])
+
+    hotspots = [
+        Hotspot(
+            function_name=funcs[0],
+            file_path=f"server/{language}/src/{base_file}",
+            line_number=line1,
+            percentage=35.0 * multiplier,
+            self_time_ms=20.0 * multiplier,
+            total_time_ms=35.0 * multiplier,
+            call_count=150,
+        ),
+        Hotspot(
+            function_name=funcs[1],
+            file_path=f"server/{language}/src/{base_file}",
+            line_number=line2,
+            percentage=22.0 * multiplier,
+            self_time_ms=12.0 * multiplier,
+            total_time_ms=22.0 * multiplier,
+            call_count=85,
+        ),
+        Hotspot(
+            function_name=funcs[2],
+            file_path=f"server/{language}/src/{base_file}",
+            line_number=line3,
+            percentage=18.0 * multiplier,
+            self_time_ms=10.0 * multiplier,
+            total_time_ms=18.0 * multiplier,
+            call_count=200,
+        ),
+    ]
+
+    return execution_time_ms, hotspots
 
 
 def step_env(action: ProfileAction) -> StepResult:
@@ -409,53 +511,37 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
 
         state.current_iteration += 1
 
-        performance_multipliers = {
-            TaskType.STRING_CONCATENATION: [1.0, 0.65, 0.45, 0.35, 0.30],
-            TaskType.LINEAR_SEARCH: [1.0, 0.70, 0.50, 0.40, 0.35],
-            TaskType.MEMORY_OPTIMIZATION: [1.0, 0.75, 0.55, 0.45, 0.35, 0.30],
-        }
+        if ProfileRunner and APIS_AVAILABLE:
+            try:
+                profile_result = ProfileRunner.profile(language=action.language, duration=5)
+                if profile_result.success:
+                    execution_time_ms = profile_result.execution_time_ms
+                    hotspots = [
+                        Hotspot(
+                            function_name=h.function_name,
+                            file_path=h.file_path,
+                            line_number=h.line_number,
+                            percentage=h.percentage,
+                            self_time_ms=h.self_time_ms,
+                            total_time_ms=h.total_time_ms,
+                            call_count=h.call_count,
+                        )
+                        for h in profile_result.hotspots
+                    ]
+                else:
+                    execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
+            except Exception as e:
+                logger.warning(f"ProfileRunner failed: {e}, using simulated data")
+                execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
+        else:
+            execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
 
-        multipliers = performance_multipliers.get(state.current_task.task_type, [1.0] * 6)
-        idx = min(state.current_iteration, len(multipliers) - 1)
-        multiplier = multipliers[idx]
-
-        execution_time_ms = state.baseline_performance_ms * multiplier
-        memory_mb = state.baseline_memory_mb * (0.9 + 0.1 * multiplier)
+        memory_mb = state.baseline_memory_mb * 0.95
 
         if execution_time_ms < state.best_performance_ms:
             state.best_performance_ms = execution_time_ms
         if memory_mb < state.best_memory_mb:
             state.best_memory_mb = memory_mb
-
-        hotspots = [
-            Hotspot(
-                function_name="build_catalog_response",
-                file_path=f"server/{action.language}/src/app.py",
-                line_number=45,
-                percentage=35.0 * multiplier,
-                self_time_ms=20.0 * multiplier,
-                total_time_ms=35.0 * multiplier,
-                call_count=150,
-            ),
-            Hotspot(
-                function_name="find_product_linear",
-                file_path=f"server/{action.language}/src/app.py",
-                line_number=78,
-                percentage=22.0 * multiplier,
-                self_time_ms=12.0 * multiplier,
-                total_time_ms=22.0 * multiplier,
-                call_count=85,
-            ),
-            Hotspot(
-                function_name="calculate_order_total",
-                file_path=f"server/{action.language}/src/app.py",
-                line_number=112,
-                percentage=18.0 * multiplier,
-                self_time_ms=10.0 * multiplier,
-                total_time_ms=18.0 * multiplier,
-                call_count=200,
-            ),
-        ]
 
         delta_percent = (
             (

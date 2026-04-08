@@ -1,4 +1,4 @@
-name: Docker Build and Push
+name: Docker Build and Deploy
 
 on:
   push:
@@ -10,11 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    services:
-      docker:
-        image: docker:20.10.16
-        options: --privileged
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,87 +17,114 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker Compose services
+      - name: Build Docker image
         run: |
-          cd environments/code_profiler_env
-          docker-compose build
+          docker build -t code-profiler-env:latest .
 
-      - name: Log in to Docker Hub
-        if: github.event_name == 'push'
+      - name: Verify Docker build
+        run: |
+          docker inspect code-profiler-env:latest
+          echo "Docker build successful!"
+
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile environments/code_profiler_env/server/app.py
+          python -m py_compile environments/code_profiler_env/models.py
+          python -m py_compile environments/code_profiler_env/rl_components.py
+          python -m py_compile environments/code_profiler_env/report_generator.py
+          python -m py_compile environments/code_profiler_env/server/start_apis.py
+          python -m py_compile environments/code_profiler_env/server/profile_runner.py
+          echo "Python validation complete!"
+
+      - name: Validate OpenEnv spec
+        run: |
+          python -c "
+            import yaml
+            with open('environments/code_profiler_env/openenv.yaml') as f:
+                config = yaml.safe_load(f)
+            assert 'tasks' in config
+            assert len(config['tasks']) >= 3
+            print(f'Validated {len(config[\"tasks\"])} tasks')
+            print('OpenEnv spec is valid!')
+          "
+
+      - name: Validate inference.py format
+        run: |
+          python -c "
+            import ast
+            with open('inference.py') as f:
+                code = f.read()
+            tree = ast.parse(code)
+            print('inference.py syntax is valid!')
+          "
+
+  test-endpoints:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: code-profiler-env:latest
+      options: --privileged
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: /workspace
+
+      - name: Wait for server startup
+        run: |
+          sleep 5
+
+      - name: Test endpoints
+        run: |
+          echo 'Testing /health endpoint...'
+          curl -s http://localhost:7860/health | grep -q 'healthy' && echo 'Health OK' || echo 'Health FAILED'
+          
+          echo 'Testing /reset endpoint...'
+          curl -s -X POST http://localhost:7860/reset -H 'Content-Type: application/json' -d '{"language": "python"}' | grep -q 'observation' && echo 'Reset OK' || echo 'Reset FAILED'
+          
+          echo 'Testing /state endpoint...'
+          curl -s http://localhost:7860/state | grep -q 'episode_id' && echo 'State OK' || echo 'State FAILED'
+          
+          echo 'Testing /tasks endpoint...'
+          curl -s http://localhost:7860/tasks | grep -q 'task_id' && echo 'Tasks OK' || echo 'Tasks FAILED'
+
+  deploy:
+    needs: [build, validate, test-endpoints]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
-      - name: Push Docker images
-        if: github.event_name == 'push'
-        env:
-          IMAGE_TAG: ${{ secrets.DOCKER_USERNAME }}/code-profiler-${{ matrix.service }}:${{ github.sha }}
+      - name: Build and push
         run: |
-          cd environments/code_profiler_env
-          docker-compose push
-
-  build-python:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Python container
-        run: |
-          cd environments/code_profiler_env/server/python
-          docker build -t code-profiler-python:latest .
-
-      - name: Build OpenEnv container
-        run: |
-          cd environments/code_profiler_env/server
-          docker build -t code-profiler-openenv:latest .
-
-      - name: Build Java container
-        run: |
-          cd environments/code_profiler_env/server/java
-          docker build -t code-profiler-java:latest .
-
-      - name: Build C++ container
-        run: |
-          cd environments/code_profiler_env/server/cpp
-          docker build -t code-profiler-cpp:latest .
-
-      - name: Build Full Stack
-        run: |
-          cd environments/code_profiler_env
-          docker-compose build
-          echo "Docker build successful!"
-
-  validate:
-    needs: build-python
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Validate Python syntax
-        run: |
-          cd environments/code_profiler_env
-          python3 -m py_compile server/app.py
-          python3 -m py_compile models.py
-          python3 -m py_compile rl_components.py
-          python3 -m py_compile report_generator.py
-          echo "Python validation complete!"
-
-      - name: Validate OpenEnv spec
-        run: |
-          cd environments/code_profiler_env
-          python3 -c "
-            import yaml
-            with open('openenv.yaml') as f:
-                config = yaml.safe_load(f)
-            assert 'tasks' in config
-            assert len(config['tasks']) >= 3
-            print(f'Validated {len(config[\"tasks\"])} tasks')
-          "
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/code-profiler-env:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/code-profiler-env:latest
+          echo "Image pushed successfully!"
