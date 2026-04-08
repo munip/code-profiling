@@ -17,19 +17,32 @@ WORKDIR /app
 # Install system dependencies and Java
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    wget \
     git \
     build-essential \
     cmake \
     default-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pre-downloaded profilers (downloaded locally via profilers/download.sh)
+# Create startup script to download profilers at runtime (not build time)
 # This avoids network issues during Docker build in HF Spaces
-COPY profilers/async-profiler/ /tmp/async-profiler/
-COPY profilers/austin /usr/local/bin/austin
-RUN chmod +x /tmp/async-profiler/profiler.sh 2>/dev/null || true && \
-    chmod +x /tmp/async-profiler/converter/*.so 2>/dev/null || true && \
-    chmod +x /usr/local/bin/austin
+RUN echo '#!/bin/bash\n\
+mkdir -p /tmp/async-profiler\n\
+if [ ! -f /tmp/async-profiler/profiler.sh ]; then\n\
+    ARCH=$(uname -m)\n\
+    if [ "$ARCH" = "aarch64" ]; then\n\
+        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz\n\
+    else\n\
+        wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz\n\
+    fi\n\
+    tar -xzf /tmp/profiler.tar.gz -C /tmp && mv /tmp/async-profiler-* /tmp/async-profiler && rm /tmp/profiler.tar.gz\n\
+fi\n\
+if [ ! -f /usr/local/bin/austin ]; then\n\
+    wget -q -O /tmp/austin.tar.xz https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz\n\
+    tar -xf /tmp/austin.tar.xz -C /tmp && mv /tmp/austin-*/austin /usr/local/bin/austin && chmod +x /usr/local/bin/austin && rm -rf /tmp/austin*\n\
+fi\n\
+exec "$@"' > /startup.sh && chmod +x /startup.sh
+
 ENV ASYNC_PROFILER_HOME=/tmp/async-profiler
 ENV PATH="/usr/local/bin:${PATH}"
 
@@ -100,4 +113,4 @@ RUN git config --global user.email "profiler@hfspaces.app" && \
 
 EXPOSE 7860
 
-CMD ["python", "-c", "import sys; sys.path.insert(0, '/app'); sys.path.insert(0, '/app/server'); from server.app import app, main; main()"]
+CMD ["/startup.sh", "python", "-c", "import sys; sys.path.insert(0, '/app'); sys.path.insert(0, '/app/server'); from server.app import app, main; main()"]
