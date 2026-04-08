@@ -1,6 +1,4 @@
-# Code Profiler Environment - HuggingFace Spaces Dockerfile
-# ==========================================================
-
+# Minimal test Dockerfile
 FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -9,17 +7,26 @@ ENV PORT=7860
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir fastapi uvicorn
 
-RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx
+RUN cat > app.py << 'EOF'
+from fastapi import FastAPI
+import uvicorn
 
-COPY environments/ ./environments/
-COPY inference.py ./
+app = FastAPI()
 
-RUN mkdir -p /app/profiles /app/logs
+@app.get("/")
+def root():
+    return {"message": "Hello from minimal app", "status": "ok"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=7860)
+EOF
 
 EXPOSE 7860
 
-CMD python -m uvicorn environments.code_profiler_env.server.app:app --host 0.0.0.0 --port $PORT
+CMD python app.py
