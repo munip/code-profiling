@@ -168,8 +168,8 @@ class PerformanceGrader:
             )
             weighted_score += score * weight
 
-        final_score = weighted_score / total_weight if total_weight > 0 else 0.001
-        final_score = max(0.001, min(0.999, final_score))
+        final_score = weighted_score / total_weight if total_weight > 0 else 0.01
+        final_score = max(0.01, min(0.99, final_score))
 
         passed = final_score >= 0.7
 
@@ -177,7 +177,7 @@ class PerformanceGrader:
         if passed:
             remaining = max_iterations - iteration
             iteration_bonus = remaining * 0.02
-            final_score = min(0.999, final_score + iteration_bonus)
+            final_score = min(0.99, final_score + iteration_bonus)
 
         feedback = PerformanceGrader._generate_feedback(
             task, breakdown, final_score, passed
