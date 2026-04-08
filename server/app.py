@@ -291,11 +291,12 @@ async def startup_event():
             subprocess.run(
                 ["tar", "-xzf", "/tmp/profiler.tar.gz", "-C", "/tmp"], check=True
             )
-            subprocess.run(
-                ["mv", "/tmp/async-profiler-" + "*", "/tmp/async-profiler"],
-                shell=True,
-                check=True,
-            )
+            # Find and move the extracted directory
+            import glob
+
+            dirs = glob.glob("/tmp/async-profiler-*")
+            if dirs:
+                subprocess.run(["mv", dirs[0], "/tmp/async-profiler"], check=True)
             Path("/tmp/profiler.tar.gz").unlink(missing_ok=True)
             logger.info("async-profiler downloaded")
         except Exception as e:
@@ -309,13 +310,19 @@ async def startup_event():
             subprocess.run(
                 ["tar", "-xf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
             )
-            Path("/tmp/austin-4.0.0-gnu-linux-amd64/austin").rename(
-                "/usr/local/bin/austin"
-            )
-            Path("/usr/local/bin/austin").chmod(0o755)
-            import shutil as sh
+            # Find and move the extracted austin binary
+            import glob
 
-            sh.rmtree("/tmp/austin-4.0.0-gnu-linux-amd64", ignore_errors=True)
+            dirs = glob.glob("/tmp/austin-*")
+            for d in dirs:
+                austin_bin = Path(d) / "austin"
+                if austin_bin.exists():
+                    import shutil
+
+                    shutil.copy(austin_bin, "/usr/local/bin/austin")
+                    Path("/usr/local/bin/austin").chmod(0o755)
+                    shutil.rmtree(d, ignore_errors=True)
+                    break
             Path("/tmp/austin.tar.xz").unlink(missing_ok=True)
             logger.info("austin downloaded")
         except Exception as e:
