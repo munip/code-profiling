@@ -49,8 +49,9 @@ from models import ProfileAction, ProfileObservation, StepResult, AVAILABLE_TASK
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-# For HF Spaces, the Space URL will be mapped to port 7860 internally
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+# For HF Spaces, use the .hf.space URL (e.g., https://munipu-openenv-stage1.hf.space)
+# Or run locally with http://localhost:7860
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://munipu-openenv-stage1.hf.space")
 BENCHMARK = "code-profiler"
 MAX_STEPS = 8
 
