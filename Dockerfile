@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx austin-python py-s
 
 COPY environments/ ./environments/
 COPY inference.py ./
+COPY README.md ./
+COPY pyproject.toml ./
 
 RUN mkdir -p /app/profiles /app/logs
 
