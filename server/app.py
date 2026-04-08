@@ -317,6 +317,18 @@ async def startup_event():
             logger.info(
                 f"Contents of /tmp/async-profiler: {list(Path('/tmp/async-profiler').iterdir()) if Path('/tmp/async-profiler').exists() else 'NOT FOUND'}"
             )
+
+            # Create profiler.sh wrapper if it doesn't exist
+            profiler_sh = Path("/tmp/async-profiler/profiler.sh")
+            if not profiler_sh.exists():
+                asprof = Path("/tmp/async-profiler/bin/asprof")
+                if asprof.exists():
+                    profiler_sh.write_text(
+                        '#!/bin/bash\nexec /tmp/async-profiler/bin/asprof "$@"\n'
+                    )
+                    profiler_sh.chmod(0o755)
+                    logger.info("Created profiler.sh wrapper")
+
             Path("/tmp/profiler.tar.gz").unlink(missing_ok=True)
             logger.info("async-profiler downloaded")
         except Exception as e:
@@ -373,8 +385,10 @@ async def startup_event():
 
     # Re-check after download attempt
     austin_path = shutil.which("austin")
-    # async-profiler has bin/asprof, check for bin directory
-    async_profiler_path = Path("/tmp/async-profiler/bin/asprof")
+    # Check for profiler.sh (wrapper) or bin/asprof (direct)
+    async_profiler_path = Path("/tmp/async-profiler/profiler.sh")
+    if not async_profiler_path.exists():
+        async_profiler_path = Path("/tmp/async-profiler/bin/asprof")
 
     logger.info("=== Profiler Availability ===")
     logger.info(
