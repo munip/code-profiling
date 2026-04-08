@@ -374,12 +374,28 @@ class CodeFixer:
 
         logger = logging.getLogger(__name__)
 
-        code = self.read_source(language)
-        if not code:
-            logger.error(f"[CODEFIX] No source code read for language={language}")
-            logger.error(f"[CODEFIX] source_paths: {self.source_paths}")
+        path = self.source_paths.get(language)
+        logger.info(f"[CODEFIX] apply_code called for language={language}")
+        logger.info(f"[CODEFIX] Source path: {path}")
+
+        if not path:
+            logger.error(f"[CODEFIX] No path configured for language={language}")
             return False
 
+        if not path.exists():
+            logger.error(f"[CODEFIX] Source file does not exist: {path}")
+            return False
+
+        code = self.read_source(language)
+        if not code:
+            logger.error(
+                f"[CODEFIX] Failed to read source code for language={language}"
+            )
+            return False
+
+        logger.info(f"[CODEFIX] Successfully read {len(code)} bytes")
+
+        # Determine function signature to search for
         if language == "python":
             func_sig = "def build_catalog_response()"
         elif language == "java":
@@ -387,21 +403,113 @@ class CodeFixer:
         else:
             func_sig = "string build_catalog_response()"
 
+        logger.info(f"[CODEFIX] Searching for exact string: repr='{repr(func_sig)}'")
+
+        # Find the position explicitly
+        found_pos = code.find(func_sig)
+        logger.info(f"[CODEFIX] code.find('{func_sig}') = {found_pos}")
+
+        if found_pos == -1:
+            logger.error(f"[CODEFIX] Function signature NOT found in source!")
+            # Show lines that contain 'build_catalog'
+            lines_with_func = [
+                i
+                for i, line in enumerate(code.split("\n"))
+                if "build_catalog" in line.lower() or "buildcatalog" in line.lower()
+            ]
+            if lines_with_func:
+                for i in lines_with_func[:5]:
+                    logger.error(
+                        f"[CODEFIX] Line {i}: {code.split(chr(10))[i].strip()}"
+                    )
+            logger.error(
+                f"[CODEFIX] Source preview (first 500 chars): {repr(code[:500])}"
+            )
+            return False
+
         start, end = self.find_function_range(code, func_sig, language)
         if start == -1:
             logger.error(
-                f"[CODEFIX] Function not found: {func_sig} in language={language}"
+                f"[CODEFIX] Could not determine function range for: {func_sig}"
             )
-            logger.error(f"[CODEFIX] Source preview: {code[:500]}...")
             return False
 
+        logger.info(f"[CODEFIX] Found function at positions {start} to {end}")
+        logger.info(f"[CODEFIX] Function length: {end - start} bytes")
+
         new_file_code = code[:start] + new_code + code[end:]
-        path = self.source_paths.get(language)
+        logger.info(
+            f"[CODEFIX] New file will have {len(new_file_code)} bytes (was {len(code)})"
+        )
+
         if path:
             path.write_text(new_file_code)
-            logger.info(f"[CODEFIX] Successfully applied code to {path}")
+            logger.info(f"[CODEFIX] Successfully wrote optimized code to {path}")
+            # Verify the write
+            new_content = path.read_text()
+            if func_sig in new_content:
+                logger.info(f"[CODEFIX] Verified: new file contains '{func_sig}'")
+            else:
+                logger.warning(
+                    f"[CODEFIX] WARNING: new file may not contain '{func_sig}'"
+                )
             return True
         logger.error(f"[CODEFIX] No path configured for language={language}")
+        return False
+
+        if not path.exists():
+            logger.error(f"[CODEFIX] Source file does not exist: {path}")
+            return False
+
+        code = self.read_source(language)
+        if not code:
+            logger.error(
+                f"[CODEFIX] Failed to read source code for language={language}"
+            )
+            return False
+
+        logger.info(f"[CODEFIX] Successfully read {len(code)} bytes")
+
+        # Determine function signature to search for
+        if language == "python":
+            func_sig = "def build_catalog_response()"
+        elif language == "java":
+            func_sig = "static String buildCatalogResponse()"
+        else:
+            func_sig = "string build_catalog_response()"
+
+        logger.info(f"[CODEFIX] Searching for function: '{func_sig}'")
+
+        # Check if function exists in code
+        if func_sig not in code:
+            logger.error(f"[CODEFIX] Function signature NOT found in source!")
+            # Try to find similar function names
+            for line in code.split("\n")[:100]:  # Check first 100 lines
+                if "build_catalog" in line.lower() or "buildcatalog" in line.lower():
+                    logger.error(f"[CODEFIX] Found similar line: {line.strip()}")
+            logger.error(f"[CODEFIX] Source preview (first 300 chars): {code[:300]}")
+            return False
+
+        start, end = self.find_function_range(code, func_sig, language)
+        if start == -1:
+            logger.error(
+                f"[CODEFIX] Could not determine function range for: {func_sig}"
+            )
+            return False
+
+        logger.info(f"[CODEFIX] Found function at positions {start} to {end}")
+
+        new_file_code = code[:start] + new_code + code[end:]
+        logger.info(
+            f"[CODEFIX] New file will have {len(new_file_code)} bytes (was {len(code)})"
+        )
+
+        if path:
+            path.write_text(new_file_code)
+            logger.info(f"[CODEFIX] Successfully wrote optimized code to {path}")
+            return True
+        logger.error(f"[CODEFIX] No path configured for language={language}")
+        return False
         return False
 
     def apply_baseline(self, language: str) -> bool:

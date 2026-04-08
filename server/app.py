@@ -268,6 +268,21 @@ previous_memory_mb = 0.0
 @app.on_event("startup")
 async def startup_event():
     """Start all API servers on startup."""
+    # Verify profiler availability
+    import shutil
+
+    austin_path = shutil.which("austin")
+    async_profiler_path = Path("/tmp/async-profiler/profiler.sh")
+
+    logger.info("=== Profiler Availability ===")
+    logger.info(
+        f"  Austin: {'FOUND at ' + austin_path if austin_path else 'NOT FOUND'}"
+    )
+    logger.info(
+        f"  Async-profiler: {'FOUND at ' + str(async_profiler_path) if async_profiler_path.exists() else 'NOT FOUND'}"
+    )
+    logger.info("==============================")
+
     if APIS_AVAILABLE and api_manager:
         logger.info("Starting API servers...")
         try:
@@ -294,7 +309,8 @@ async def shutdown_event():
 
 def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetResponse:
     """Reset the environment for a specific task or random task."""
-    global state, previous_time_ms, previous_memory_mb
+    global state, previous_time_ms, previous_memory_mb, current_outcome
+    current_outcome = None  # Reset outcome at start of episode
 
     if task_id and task_id in TASK_MAP:
         task = TASK_MAP[task_id]
@@ -418,12 +434,19 @@ def _copy_baseline_templates(language: str):
             logger.warning(f"[RESET] Failed to copy baseline template: {e}")
 
 
-def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
+def _get_simulated_profile(
+    state: ProfileState, language: str, outcome: str = None
+) -> tuple:
     """
     Generate simulated profiling data as fallback.
 
     This is used when real profilers (austin/async-profiler) are unavailable.
     In production, real profiling should always be attempted first.
+
+    Args:
+        state: Current profiling state
+        language: Programming language being profiled
+        outcome: The action taken ('improve', 'degrade', 'remove', 'unchanged')
     """
     performance_multipliers = {
         TaskType.STRING_CONCATENATION: [1.0, 0.65, 0.45, 0.35, 0.30],
@@ -433,7 +456,33 @@ def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
 
     multipliers = performance_multipliers.get(state.current_task.task_type, [1.0] * 6)
     idx = min(state.current_iteration, len(multipliers) - 1)
-    multiplier = multipliers[idx]
+    base_multiplier = multipliers[idx]
+
+    # Adjust multiplier based on outcome
+    if outcome == "improve":
+        # Move to next better multiplier (faster)
+        multiplier = multipliers[min(idx + 1, len(multipliers) - 1)]
+        logger.info(
+            f"[SIM] Outcome 'improve': using multiplier {multiplier:.2f} (idx {idx} -> {min(idx + 1, len(multipliers) - 1)})"
+        )
+    elif outcome == "degrade":
+        # Move to previous worse multiplier (slower)
+        multiplier = (
+            multipliers[max(0, idx - 1)] * 1.2
+        )  # Make degradation more pronounced
+        logger.info(
+            f"[SIM] Outcome 'degrade': using multiplier {multiplier:.2f} (idx {idx} -> {max(0, idx - 1)})"
+        )
+    elif outcome == "remove":
+        # Keep current multiplier (no change from previous state)
+        multiplier = base_multiplier
+        logger.info(
+            f"[SIM] Outcome 'remove': using multiplier {multiplier:.2f} (no change)"
+        )
+    else:
+        # Default: use base multiplier for iteration
+        multiplier = base_multiplier
+        logger.info(f"[SIM] Outcome '{outcome}': using multiplier {multiplier:.2f}")
 
     execution_time_ms = state.baseline_performance_ms * multiplier
 
@@ -503,7 +552,7 @@ def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
 
 def step_env(action: ProfileAction) -> StepResult:
     """Process a step in the environment."""
-    global state, previous_time_ms, previous_memory_mb
+    global state, previous_time_ms, previous_memory_mb, current_outcome
 
     state.step_count += 1
     observation = ProfileObservation(
@@ -654,15 +703,17 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
                     ]
                 else:
                     execution_time_ms, hotspots = _get_simulated_profile(
-                        state, action.language
+                        state, action.language, current_outcome
                     )
             except Exception as e:
                 logger.warning(f"ProfileRunner failed: {e}, using simulated data")
                 execution_time_ms, hotspots = _get_simulated_profile(
-                    state, action.language
+                    state, action.language, current_outcome
                 )
         else:
-            execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
+            execution_time_ms, hotspots = _get_simulated_profile(
+                state, action.language, current_outcome
+            )
 
         memory_mb = state.baseline_memory_mb * 0.95
 
@@ -1033,6 +1084,7 @@ async def run_full_episode(request: RunEpisodeRequest):
     3. Rebuild container on improvements
     4. Generate improvement report
     """
+    global current_outcome
     logger.info(
         f"[EPISODE] Starting full episode - task: {request.task_id}, lang: {request.language}"
     )
@@ -1142,6 +1194,10 @@ async def run_full_episode(request: RunEpisodeRequest):
                 last_improved_sha = commit_sha
 
         await asyncio.sleep(0.5)
+
+        # Set current outcome for simulated profiler
+        current_outcome = outcome
+        logger.info(f"[EPISODE] Setting outcome to '{outcome}' for profiling")
 
         action = ProfileAction(
             action_type="profile",
