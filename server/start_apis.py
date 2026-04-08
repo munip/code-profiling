@@ -51,29 +51,28 @@ class APIServerManager:
                 logger.info("Python API already running")
                 return True
 
+            if not os.path.exists(PYTHON_APP_PATH):
+                logger.error(f"Python app not found: {PYTHON_APP_PATH}")
+                return False
+
             env = os.environ.copy()
-            env["FLASK_ENV"] = "production"
             env["PYTHONUNBUFFERED"] = "1"
-            env["FLASK_APP"] = PYTHON_APP_PATH
+            env["FLASK_ENV"] = "production"
 
             self.python_server.process = subprocess.Popen(
-                [
-                    "python",
-                    "-c",
-                    f"from flask import Flask, jsonify; app = Flask(__name__); exec(open('{PYTHON_APP_PATH}').read()); app.run(host='0.0.0.0', port={PYTHON_API_PORT})",
-                ],
+                ["python", PYTHON_APP_PATH],
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid if os.name != "nt" else None,
             )
 
-            if self._wait_for_server(self.python_server.port):
+            if self._wait_for_server(self.python_server.port, timeout=10):
                 self.python_server.running = True
                 logger.info(f"Python API started on port {PYTHON_API_PORT}")
                 return True
             else:
-                logger.error("Python API failed to start")
+                logger.error("Python API failed to start - health check failed")
                 return False
         except Exception as e:
             logger.error(f"Error starting Python API: {e}")
@@ -91,8 +90,12 @@ class APIServerManager:
                 logger.error(f"Java class not found: {java_class}")
                 return False
 
-            logger.info(f"Java class found at: {java_class} (console app - for profiling only)")
-            logger.info("Java will be profiled by running with test input, not as HTTP server")
+            logger.info(
+                f"Java class found at: {java_class} (console app - for profiling only)"
+            )
+            logger.info(
+                "Java will be profiled by running with test input, not as HTTP server"
+            )
             self.java_server.running = True
             return True
         except Exception as e:
@@ -110,8 +113,12 @@ class APIServerManager:
                 logger.error(f"C++ binary not found: {CPP_BINARY}")
                 return False
 
-            logger.info(f"C++ binary found at: {CPP_BINARY} (console app - for profiling only)")
-            logger.info("C++ will be profiled by running with test input, not as HTTP server")
+            logger.info(
+                f"C++ binary found at: {CPP_BINARY} (console app - for profiling only)"
+            )
+            logger.info(
+                "C++ will be profiled by running with test input, not as HTTP server"
+            )
             self.cpp_server.running = True
             return True
         except Exception as e:
@@ -132,7 +139,9 @@ class APIServerManager:
         if self.python_server.process:
             try:
                 if os.name != "nt":
-                    os.killpg(os.getpgid(self.python_server.process.pid), signal.SIGTERM)
+                    os.killpg(
+                        os.getpgid(self.python_server.process.pid), signal.SIGTERM
+                    )
                 else:
                     self.python_server.process.terminate()
                 self.python_server.process.wait(timeout=5)
@@ -200,12 +209,16 @@ class APIServerManager:
             "python": {
                 "running": self.python_server.running,
                 "port": self.python_server.port,
-                "pid": self.python_server.process.pid if self.python_server.process else None,
+                "pid": self.python_server.process.pid
+                if self.python_server.process
+                else None,
             },
             "java": {
                 "running": self.java_server.running,
                 "port": self.java_server.port,
-                "pid": self.java_server.process.pid if self.java_server.process else None,
+                "pid": self.java_server.process.pid
+                if self.java_server.process
+                else None,
             },
             "cpp": {
                 "running": self.cpp_server.running,

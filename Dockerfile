@@ -54,8 +54,8 @@ COPY README.md ./
 # Copy templates
 COPY environments/code_profiler_env/templates/ ./server/templates/
 
-# Install Python dependencies (uvicorn, fastapi, etc.)
-RUN pip install --no-cache-dir uvicorn fastapi pydantic httpx pyyaml psutil openenv-core
+# Install Python dependencies (uvicorn, fastapi, flask, etc.)
+RUN pip install --no-cache-dir uvicorn fastapi pydantic httpx pyyaml psutil openenv-core flask
 
 # Create directories
 RUN mkdir -p /app/profiles /app/logs /app/server/python/src \
