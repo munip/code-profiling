@@ -15,28 +15,31 @@ The environment is designed for the OpenEnv hackathon and follows the full OpenE
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    AI Agent (LLM)                            │
-│              (Generates and fixes code)                      │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                OpenEnv RL Framework                          │
-│         CodeProfilerEnv(reset, step, state)                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Code Profiler Environment Server               │
-│     - Task Management (Easy/Medium/Hard)                     │
-│     - Performance Graders (0.0-1.0 scores)                    │
-│     - Hotspot Analysis                                       │
+```                       
+                             ┌──────────────────────────────────────────┐
+                             ▼                                          │
+┌─────────────────────────────────────────────────────────────┐         │
+│                    AI Agent (LLM)                           │─────────│
+│              (Generates and fixes code)                     │         │
+└────────────────────────────┬────────────────────────────────┘         │
+                             │                                          │
+                             ▼                                          │
+┌─────────────────────────────────────────────────────────────┐         │
+│                OpenEnv RL Framework                         │─────────│ 
+│         CodeProfilerEnv(reset, step, state)                 │         │
+└────────────────────────────┬────────────────────────────────┘         │ 
+                             │                                          │
+                             ▼                                          │
+┌─────────────────────────────────────────────────────────────┐         │
+│               Code Profiler Environment Server              │─────────┘
+│     - Task Management (Easy/Medium/Hard)                    │
+│     - Performance Graders (0.0-1.0 scores)                  │
+│     - Hotspot Analysis                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Tasks
+## Sample Tasks
+A few simple functions taken from different code generation and review judge tools as illustrative examples
 
 ### Easy: String Concatenation (Python)
 | Property | Value |
