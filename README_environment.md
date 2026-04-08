@@ -1,6 +1,6 @@
 # Code Profiler Environment
 
-An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks in Python, Java, and C++ code through graded rewards.
+An OpenEnv RL environment for iterative code profiling and performance optimization that work with coding agent generated code in the environment. Performance is the first NFR environment preparation. With this model other NFR requirement orchestration like security, privacy checks or even scalability / availability tests can be added. In this environment, agents learn to identify and fix performance bottlenecks in Python, Java, and C++ code through graded rewards.
 
 ## Overview
 
@@ -311,8 +311,24 @@ code-profiling/
 │       ├── openenv.yaml          # OpenEnv spec
 │       └── server/
 │           └── app.py            # FastAPI server
+|   └── server/                   #Simulated environment for code profiling
+|       └──cpp
+|          └──src
+|          |  └── main.cpp        # Baseline generated C++ code
+|          ├──CMAkeLists.txt      # build list for make
+|          ├──Dockerfile          # C++ container builder Dockerfile
+|       └──java
+|          └──src\com\ecommerce\api
+|          |  └── ECommerceAPI.java     # Baseline generated Java code
+|          ├──Dockerfile          # Java container builder Dockerfile
+|       └──python
+|          └──src
+|          |  └── app.py          # Baseline generated Python code
+|          ├──Dockerfile          # Python container builder 
+|       ├──app.py                 # Main openenv driver app code
+|       ├──Dockerfile             # openenv driving container 
 ├── inference.py                  # Baseline inference script
-├── Dockerfile                     # HF Space Dockerfile
+├── Dockerfile                    # HF Space Dockerfile
 ├── docker-compose.yml            # Container orchestration
 ├── README.md                     # This file
 ├── README_sdk.md                 # HF Space description
