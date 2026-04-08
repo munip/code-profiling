@@ -61,6 +61,51 @@ class GitManager:
         except Exception:
             return ""
 
+    def commit_performance_fix(
+        self, iteration: int, result: str, issue_type: str = None, diff_summary: str = None
+    ) -> str:
+        """
+        Commit with performance iteration message format.
+
+        Args:
+            iteration: The iteration number
+            result: 'improve', 'degrade', or 'remove(previous optimized change)'
+            issue_type: The type of issue fixed (e.g., 'string_concat', 'linear_search')
+            diff_summary: Optional summary of the code changes
+
+        Returns:
+            The commit SHA if successful, empty string otherwise
+        """
+        issue_tag = f"({issue_type})" if issue_type else ""
+        message = f"iteration {iteration}: {result} {issue_tag}"
+
+        if diff_summary:
+            message = f"{message}\n\n{diff_summary}"
+
+        return self.commit(message)
+
+    def is_repo_clean(self) -> bool:
+        """Check if the repository has uncommitted changes."""
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain"], cwd=self.repo_path, capture_output=True, text=True
+            )
+            return len(result.stdout.strip()) == 0
+        except Exception:
+            return True
+
+    def get_diff_summary(self, file_path: str = None) -> str:
+        """Get a summary of changes."""
+        try:
+            cmd = ["git", "diff", "--stat"]
+            if file_path:
+                cmd.append("--", file_path)
+
+            result = subprocess.run(cmd, cwd=self.repo_path, capture_output=True, text=True)
+            return result.stdout.strip() if result.returncode == 0 else ""
+        except Exception:
+            return ""
+
     def checkout_from_baseline(self, path: str) -> bool:
         """Checkout a file from the baseline commit."""
         try:

@@ -286,6 +286,8 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
     baseline_time = baseline_times.get(task.task_type.value, 100.0)
     baseline_memory = 45.0
 
+    _copy_baseline_templates(language)
+
     state = ProfileState(
         episode_id=str(uuid.uuid4()),
         step_count=0,
@@ -324,8 +326,41 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
     return ResetResponse(observation=observation, state=state, available_tasks=AVAILABLE_TASKS)
 
 
+def _copy_baseline_templates(language: str):
+    """Copy baseline templates to working directory."""
+    import shutil
+
+    base_dir = Path(__file__).parent.parent.parent
+    templates_dir = base_dir / "templates" / language
+
+    if language == "python":
+        dest = base_dir / "server" / "python" / "src" / "app.py"
+    elif language == "java":
+        dest = (
+            base_dir / "server" / "java" / "src" / "com" / "ecommerce" / "api" / "ECommerceAPI.java"
+        )
+    elif language == "cpp":
+        dest = base_dir / "server" / "cpp" / "src" / "main.cpp"
+    else:
+        return
+
+    src = templates_dir / dest.name
+
+    if src.exists():
+        try:
+            shutil.copy2(src, dest)
+            logger.info(f"[RESET] Copied baseline template from {src} to {dest}")
+        except Exception as e:
+            logger.warning(f"[RESET] Failed to copy baseline template: {e}")
+
+
 def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
-    """Generate simulated profiling data as fallback."""
+    """
+    Generate simulated profiling data as fallback.
+
+    This is used when real profilers (austin/async-profiler) are unavailable.
+    In production, real profiling should always be attempted first.
+    """
     performance_multipliers = {
         TaskType.STRING_CONCATENATION: [1.0, 0.65, 0.45, 0.35, 0.30],
         TaskType.LINEAR_SEARCH: [1.0, 0.70, 0.50, 0.40, 0.35],
@@ -337,6 +372,13 @@ def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
     multiplier = multipliers[idx]
 
     execution_time_ms = state.baseline_performance_ms * multiplier
+
+    issue_type_map = {
+        TaskType.STRING_CONCATENATION: "string_concat",
+        TaskType.LINEAR_SEARCH: "linear_search",
+        TaskType.MEMORY_OPTIMIZATION: "memory_copy",
+    }
+    issue_type = issue_type_map.get(state.current_task.task_type, "performance")
 
     file_map = {
         "python": ("app.py", 45, 78, 112),
@@ -599,6 +641,34 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         logger.info(f"[PROFILE] Score: {grader_result.score:.2f}")
         logger.info(f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}")
         logger.info(f"[PROFILE] ============================================")
+
+        git_manager = GitManager()
+        if hotspots and hotspots[0].function_name:
+            issue_type_map = {
+                "build_catalog_response": "string_concat",
+                "find_product": "linear_search",
+                "calculate_order_total": "repeated_calculation",
+            }
+            issue_type = "performance"
+            for pattern, itype in issue_type_map.items():
+                if pattern in hotspots[0].function_name:
+                    issue_type = itype
+                    break
+
+            outcome = (
+                "improve"
+                if delta_percent < -5
+                else ("degrade" if delta_percent > 5 else "unchanged")
+            )
+            commit_sha = git_manager.commit_performance_fix(
+                iteration=state.current_iteration,
+                result=outcome,
+                issue_type=issue_type,
+            )
+            if commit_sha:
+                logger.info(f"[GIT] Committed: {commit_sha}")
+            else:
+                logger.info(f"[GIT] No changes to commit")
 
         reward = grader_result.score
         cumulative_score = grader_result.score
