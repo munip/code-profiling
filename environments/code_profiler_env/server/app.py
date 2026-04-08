@@ -350,7 +350,7 @@ def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
         "cpp": ("build_catalog_response", "find_product_linear", "calculate_order_total"),
     }
 
-    lang = language.lower()[:2]
+    lang = language.lower()
     base_file, line1, line2, line3 = file_map.get(lang, file_map["python"])
     funcs = func_map.get(lang, func_map["python"])
 

@@ -223,6 +223,62 @@ AVAILABLE_TASKS = [
             "Consider using string_view instead of string copies",
         ],
     ),
+    Task(
+        task_id="java-string-concat-easy",
+        name="Fix String Concatenation (Java)",
+        description="The Java e-commerce API has string concatenation in loops causing slow responses. "
+        "Fix the buildCatalogResponse method to use StringBuilder for efficient string building.",
+        difficulty=TaskDifficulty.EASY,
+        task_type=TaskType.STRING_CONCATENATION,
+        target_language="java",
+        max_iterations=3,
+        grading_criteria=[
+            GradingCriteria(metric="execution_time", target=50.0, threshold=80.0, weight=0.7),
+            GradingCriteria(metric="delta_percent", target=-50.0, threshold=-20.0, weight=0.3),
+        ],
+        hints=[
+            "Use StringBuilder instead of + concatenation",
+            "Use String.join() for multiple strings",
+        ],
+    ),
+    Task(
+        task_id="java-linear-search-medium",
+        name="Fix Linear Search (Java)",
+        description="The Java product search uses O(n) linear search. Optimize findProductLinear "
+        "to use HashMap for O(1) access.",
+        difficulty=TaskDifficulty.MEDIUM,
+        task_type=TaskType.LINEAR_SEARCH,
+        target_language="java",
+        max_iterations=4,
+        grading_criteria=[
+            GradingCriteria(metric="execution_time", target=30.0, threshold=60.0, weight=0.6),
+            GradingCriteria(metric="hotspot_reduction", target=80.0, threshold=50.0, weight=0.4),
+        ],
+        hints=[
+            "Use HashMap to cache products by ID",
+            "Build index on first access, then O(1) lookups",
+        ],
+    ),
+    Task(
+        task_id="java-memory-optimization-hard",
+        name="Fix Memory Optimization (Java)",
+        description="The Java implementation has excessive object creation and memory churn. "
+        "Optimize to reduce GC pressure and improve cache locality.",
+        difficulty=TaskDifficulty.HARD,
+        task_type=TaskType.MEMORY_OPTIMIZATION,
+        target_language="java",
+        max_iterations=5,
+        grading_criteria=[
+            GradingCriteria(metric="execution_time", target=20.0, threshold=40.0, weight=0.4),
+            GradingCriteria(metric="memory_usage", target=50.0, threshold=100.0, weight=0.4),
+            GradingCriteria(metric="hotspot_reduction", target=70.0, threshold=40.0, weight=0.2),
+        ],
+        hints=[
+            "Use object pooling for frequently created objects",
+            "Pre-allocate collections with expected size",
+            "Use primitive arrays instead of object collections where possible",
+        ],
+    ),
 ]
 
 TASK_MAP = {task.task_id: task for task in AVAILABLE_TASKS}
