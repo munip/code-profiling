@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=9
+ARG BUILD_VERSION=10
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -28,9 +28,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV ASYNC_PROFILER_HOME=/opt/async-profiler
 RUN mkdir -p /opt/async-profiler && \
     wget --timeout=120 --tries=2 https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz -O /tmp/async.tgz && \
-    tar -xzf /tmp/async.tgz -C /opt/async-profiler --strip-components=1 && \
+    tar -xzf /tmp/async.tgz -C /tmp && \
+    mv /tmp/async-profiler-*/* /opt/async-profiler/ && \
     chmod +x /opt/async-profiler/profiler.sh && \
-    rm -f /tmp/async.tgz
+    rm -rf /tmp/async.tgz /tmp/async-profiler-*
 ENV PATH=$PATH:/opt/async-profiler
 
 # Download and install austin for Python/C++ profiling
