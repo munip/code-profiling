@@ -21,8 +21,7 @@ COPY pyproject.toml ./
 
 
 # Copy application code
-COPY envir
-onments/ ./environments/
+COPY environments/ ./environments/
 COPY inference.py ./
 COPY README.md ./
 
