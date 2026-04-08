@@ -80,7 +80,7 @@ class APIServerManager:
             return False
 
     def start_java_api(self) -> bool:
-        """Start Java API server."""
+        """Start Java API server (console app - processes single request and exits)."""
         try:
             if self.java_server.running:
                 logger.info("Java API already running")
@@ -91,33 +91,16 @@ class APIServerManager:
                 logger.error(f"Java class not found: {java_class}")
                 return False
 
-            logger.info(f"Java class found at: {java_class}")
-
-            self.java_server.process = subprocess.Popen(
-                ["java", "-cp", "/app/server/java/src:/app/java_classes", JAVA_MAIN_CLASS],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                preexec_fn=os.setsid if os.name != "nt" else None,
-            )
-
-            time.sleep(2)
-            poll = self.java_server.process.poll()
-            if poll is not None:
-                stdout, stderr = self.java_server.process.communicate()
-                logger.error(f"Java process exited immediately with code {poll}")
-                logger.error(f"stdout: {stdout.decode() if stdout else ''}")
-                logger.error(f"stderr: {stderr.decode() if stderr else ''}")
-                return False
-
+            logger.info(f"Java class found at: {java_class} (console app - for profiling only)")
+            logger.info("Java will be profiled by running with test input, not as HTTP server")
             self.java_server.running = True
-            logger.info(f"Java API started on port {JAVA_API_PORT}")
             return True
         except Exception as e:
             logger.error(f"Error starting Java API: {e}")
             return False
 
     def start_cpp_api(self) -> bool:
-        """Start C++ API server."""
+        """Start C++ API server (console app - processes single request and exits)."""
         try:
             if self.cpp_server.running:
                 logger.info("C++ API already running")
@@ -127,26 +110,9 @@ class APIServerManager:
                 logger.error(f"C++ binary not found: {CPP_BINARY}")
                 return False
 
-            logger.info(f"C++ binary found at: {CPP_BINARY}")
-
-            self.cpp_server.process = subprocess.Popen(
-                [CPP_BINARY],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                preexec_fn=os.setsid if os.name != "nt" else None,
-            )
-
-            time.sleep(2)
-            poll = self.cpp_server.process.poll()
-            if poll is not None:
-                stdout, stderr = self.cpp_server.process.communicate()
-                logger.error(f"C++ process exited immediately with code {poll}")
-                logger.error(f"stdout: {stdout.decode() if stdout else ''}")
-                logger.error(f"stderr: {stderr.decode() if stderr else ''}")
-                return False
-
+            logger.info(f"C++ binary found at: {CPP_BINARY} (console app - for profiling only)")
+            logger.info("C++ will be profiled by running with test input, not as HTTP server")
             self.cpp_server.running = True
-            logger.info(f"C++ API started on port {CPP_API_PORT}")
             return True
         except Exception as e:
             logger.error(f"Error starting C++ API: {e}")

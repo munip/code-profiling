@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=3
+ARG BUILD_VERSION=19
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -86,6 +86,13 @@ RUN if [ -f /app/server/cpp/build/ecommerce_api ]; then \
         echo "ERROR: C++ binary NOT found!"; \
         exit 1; \
     fi
+
+# Initialize git repo for code versioning (required for commit_performance_fix)
+RUN git config --global user.email "profiler@hfspaces.app" && \
+    git config --global user.name "Code Profiler" && \
+    git init && \
+    git add -A && \
+    git commit -m "v1-baseline: initial code ready for profiling"
 
 EXPOSE 7860
 
