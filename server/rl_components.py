@@ -41,7 +41,26 @@ class GitManager:
     """Handles git operations for code versioning."""
 
     def __init__(self, repo_path: Path = None):
-        self.repo_path = repo_path or Path.cwd()
+        import logging
+        self._logger = logging.getLogger(__name__)
+        self.repo_path = repo_path or Path("/app")
+        self._ensure_git_repo()
+        self._logger.info(f"[GIT] Initialized with repo_path={self.repo_path}")
+    
+    def _ensure_git_repo(self):
+        """Ensure the directory is a git repository."""
+        git_dir = self.repo_path / ".git"
+        if not git_dir.exists():
+            self._logger.info("[GIT] No .git directory found, initializing...")
+            try:
+                subprocess.run(["git", "init"], cwd=self.repo_path, check=True, capture_output=True)
+                subprocess.run(["git", "config", "user.email", "profiler@hfspaces.app"], cwd=self.repo_path, check=True, capture_output=True)
+                subprocess.run(["git", "config", "user.name", "Code Profiler"], cwd=self.repo_path, check=True, capture_output=True)
+                subprocess.run(["git", "add", "-A"], cwd=self.repo_path, check=True, capture_output=True)
+                subprocess.run(["git", "commit", "-m", "baseline: initial code"], cwd=self.repo_path, check=True, capture_output=True)
+                self._logger.info("[GIT] Git repo initialized with baseline commit")
+            except Exception as e:
+                self._logger.error(f"[GIT] Failed to init git repo: {e}")
 
     def commit(self, message: str) -> str:
         """Commit current changes."""
@@ -757,3 +776,5 @@ class OutcomeDeterminer:
             return random.choice(["improve", "degrade", "remove"])
         else:
             return random.choice(["improve", "degrade", "remove"])
+
+
