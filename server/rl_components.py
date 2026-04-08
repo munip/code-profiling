@@ -457,61 +457,6 @@ class CodeFixer:
         logger.error(f"[CODEFIX] No path configured for language={language}")
         return False
 
-        if not path.exists():
-            logger.error(f"[CODEFIX] Source file does not exist: {path}")
-            return False
-
-        code = self.read_source(language)
-        if not code:
-            logger.error(
-                f"[CODEFIX] Failed to read source code for language={language}"
-            )
-            return False
-
-        logger.info(f"[CODEFIX] Successfully read {len(code)} bytes")
-
-        # Determine function signature to search for
-        if language == "python":
-            func_sig = "def build_catalog_response()"
-        elif language == "java":
-            func_sig = "static String buildCatalogResponse()"
-        else:
-            func_sig = "string build_catalog_response()"
-
-        logger.info(f"[CODEFIX] Searching for function: '{func_sig}'")
-
-        # Check if function exists in code
-        if func_sig not in code:
-            logger.error(f"[CODEFIX] Function signature NOT found in source!")
-            # Try to find similar function names
-            for line in code.split("\n")[:100]:  # Check first 100 lines
-                if "build_catalog" in line.lower() or "buildcatalog" in line.lower():
-                    logger.error(f"[CODEFIX] Found similar line: {line.strip()}")
-            logger.error(f"[CODEFIX] Source preview (first 300 chars): {code[:300]}")
-            return False
-
-        start, end = self.find_function_range(code, func_sig, language)
-        if start == -1:
-            logger.error(
-                f"[CODEFIX] Could not determine function range for: {func_sig}"
-            )
-            return False
-
-        logger.info(f"[CODEFIX] Found function at positions {start} to {end}")
-
-        new_file_code = code[:start] + new_code + code[end:]
-        logger.info(
-            f"[CODEFIX] New file will have {len(new_file_code)} bytes (was {len(code)})"
-        )
-
-        if path:
-            path.write_text(new_file_code)
-            logger.info(f"[CODEFIX] Successfully wrote optimized code to {path}")
-            return True
-        logger.error(f"[CODEFIX] No path configured for language={language}")
-        return False
-        return False
-
     def apply_baseline(self, language: str) -> bool:
         """Apply baseline code."""
         return self.apply_code(language, self.BASELINE_CODE.get(language, ""))
