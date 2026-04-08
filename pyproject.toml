@@ -1,56 +1,35 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "code-profiler-env"
+name = "openenv-code_profiler_env"
 version = "0.1.0"
-description = "OpenEnv environment for code profiling and performance optimization"
-readme = "README.md"
+description = "Code Profiler Env environment for OpenEnv"
 requires-python = ">=3.10"
-license = "MIT"
-authors = [
-    { name = "Code Profiling Team" }
-]
 dependencies = [
+    "openenv-core[core]>=0.2.2",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "pydantic>=2.0.0",
     "httpx>=0.25.0",
-    "openai>=1.0.0",
-    "austin-python>=2.1.2,<3.0.0",
-    "py-spy>=0.3.14",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "ruff>=0.1.0",
-    "mypy>=1.7.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/code-profiling/code-profiler-env"
-Documentation = "https://meta-pytorch.org/OpenEnv/"
-Repository = "https://github.com/code-profiling/code-profiler-env"
+[project.scripts]
+server = "server.app:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["environments/code_profiler_env"]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "/environments",
-    "/src",
-]
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-
-[tool.mypy]
-python_version = "3.10"
-strict = true
+[tool.setuptools]
+include-package-data = true
+packages = ["server"]

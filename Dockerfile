@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=2
+ARG BUILD_VERSION=22
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -39,14 +39,23 @@ RUN set +e; \
     set -e
 ENV PATH="/usr/local/bin:${PATH}"
 
-# Install Python dependencies
-RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx py-spy openai pyyaml psutil flask
-
-COPY environments/ ./environments/
+# Copy project files from root
+COPY __init__.py ./
+COPY client.py ./
+COPY models.py ./
+COPY rl_loop_runner.py ./
+COPY server/ ./server/
+COPY openenv.yaml ./
+COPY pyproject.toml ./
+COPY uv.lock ./
 COPY inference.py ./
 COPY README.md ./
-COPY pyproject.toml ./
-COPY environments/code_profiler_env/openenv.yaml ./openenv.yaml
+
+# Copy templates
+COPY environments/code_profiler_env/templates/ ./server/templates/
+
+# Install uv and generate lock file
+RUN pip install uv && uv lock --python python3.10
 
 # Create directories
 RUN mkdir -p /app/profiles /app/logs /app/server/python/src \
@@ -97,4 +106,4 @@ RUN git config --global user.email "profiler@hfspaces.app" && \
 
 EXPOSE 7860
 
-CMD ["python", "-m", "uvicorn", "environments.code_profiler_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
