@@ -6,7 +6,6 @@ FROM python:3.10-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PORT=7860
 
 # Set working directory
 WORKDIR /app
@@ -28,8 +27,8 @@ RUN pip install --no-cache-dir -e .
 # Create profiles directory
 RUN mkdir -p /app/profiles /app/logs
 
-# Expose port (HF Spaces default is 7860)
+# Expose port (HF Spaces will set PORT env var)
 EXPOSE 7860
 
-# Run the application
-CMD ["uvicorn", "environments.code_profiler_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run using module path
+CMD python -m uvicorn environments.code_profiler_env.server.app:app --host 0.0.0.0 --port $PORT
