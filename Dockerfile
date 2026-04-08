@@ -17,26 +17,20 @@ WORKDIR /app
 # Install system dependencies and Java
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    wget \
     git \
     build-essential \
     cmake \
     default-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Download async-profiler to /tmp
-RUN mkdir -p /tmp/async-profiler && \
-    wget --timeout=120 --tries=2 https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz -O - | tar -xz -C /tmp && \
-    mv /tmp/async-profiler-* /tmp/async-profiler
+# Copy pre-downloaded profilers (downloaded locally via profilers/download.sh)
+# This avoids network issues during Docker build in HF Spaces
+COPY profilers/async-profiler/ /tmp/async-profiler/
+COPY profilers/austin /usr/local/bin/austin
+RUN chmod +x /tmp/async-profiler/profiler.sh 2>/dev/null || true && \
+    chmod +x /tmp/async-profiler/converter/*.so 2>/dev/null || true && \
+    chmod +x /usr/local/bin/austin
 ENV ASYNC_PROFILER_HOME=/tmp/async-profiler
-
-# Download austin and add to PATH
-RUN set +e; \
-    wget --timeout=120 --tries=2 https://github.com/nickparajon/austin/releases/download/2.1.2/austin-2.1.2-x64.gz -O /tmp/austin.gz; \
-    gunzip -f /tmp/austin.gz; \
-    chmod +x /tmp/austin; \
-    mv /tmp/austin /usr/local/bin/austin; \
-    set -e
 ENV PATH="/usr/local/bin:${PATH}"
 
 # Copy project files from root

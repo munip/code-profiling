@@ -34,3 +34,6 @@ Thumbs.db
 # Local testing
 *.log
 .ruff_cache/
+
+# Pre-downloaded profilers (run profilers/download.sh to fetch)
+profilers/

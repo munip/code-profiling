@@ -1,0 +1,29 @@
+# Profilers Directory
+
+This directory contains pre-downloaded profiler binaries for the Docker image.
+
+## Contents
+
+- `async-profiler/` - Java profiler (extracted from async-profiler-*-linux-*.tar.gz)
+- `austin` - Python/C++ profiler binary
+
+## How to Download Profilers
+
+Run the download script on your local machine before building the Docker image:
+
+```bash
+cd profilers
+./download.sh
+```
+
+This script will:
+1. Detect your architecture (x64 or arm64)
+2. Download the appropriate async-profiler version
+3. Download austin
+4. Extract and place them in the correct locations
+
+## Why Pre-download?
+
+HF Spaces Docker builds have network restrictions that prevent downloading
+from GitHub during image build. By downloading locally and copying into the
+image, we avoid these issues.
