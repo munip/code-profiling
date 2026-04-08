@@ -8,10 +8,20 @@ import random
 import threading
 from pathlib import Path
 
-app_dir = Path(__file__).parent.resolve()
+app_dir = (
+    Path(__file__).parent.resolve() if "__file__" in dir() else Path.cwd() / "server"
+)
 project_root = app_dir.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(app_dir))
+
+if os.name != "nt" and os.path.exists("/app"):
+    os.chdir("/app")
+    sys.path.insert(0, "/app")
+    sys.path.insert(0, "/app/server")
+else:
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    if str(app_dir) not in sys.path:
+        sys.path.insert(0, str(app_dir))
 
 import uuid
 from datetime import datetime
@@ -1238,6 +1248,7 @@ async def run_full_episode(request: RunEpisodeRequest):
 def main():
     import uvicorn
     import os
+
     print(f"Starting uvicorn for OpenEnv Environment API - version 1.0.0-hackathon")
     port = int(os.getenv("PORT", "7860"))
     uvicorn.run(app, host="0.0.0.0", port=port)
