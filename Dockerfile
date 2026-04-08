@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=10
+ARG BUILD_VERSION=11
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -24,22 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install async-profiler for Java
-ENV ASYNC_PROFILER_HOME=/opt/async-profiler
-RUN mkdir -p /opt/async-profiler && \
-    wget --timeout=120 --tries=2 https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz -O /tmp/async.tgz && \
-    tar -xzf /tmp/async.tgz -C /tmp && \
-    mv /tmp/async-profiler-*/* /opt/async-profiler/ && \
-    chmod +x /opt/async-profiler/profiler.sh && \
-    rm -rf /tmp/async.tgz /tmp/async-profiler-*
-ENV PATH=$PATH:/opt/async-profiler
+# Download async-profiler to /tmp
+RUN mkdir -p /tmp/async-profiler && \
+    wget --timeout=120 --tries=2 https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz -O - | tar -xz -C /tmp && \
+    mv /tmp/async-profiler-* /tmp/async-profiler
+ENV ASYNC_PROFILER_HOME=/tmp/async-profiler
 
-# Download and install austin for Python/C++ profiling
+# Download austin to /tmp (may fail on HF Spaces - will use simulated)
 RUN set +e; \
-    wget --timeout=120 --tries=2 https://github.com/nickparajon/austin/releases/download/2.1.2/austin-2.1.2-x64.gz -O /tmp/austin.gz 2>/dev/null && \
-    gunzip -f /tmp/austin.gz && \
-    chmod +x /tmp/austin && \
-    mv /tmp/austin /usr/local/bin/austin; \
+    wget --timeout=120 --tries=2 https://github.com/nickparajon/austin/releases/download/2.1.2/austin-2.1.2-x64.gz -O /tmp/austin.gz; \
+    gunzip -f /tmp/austin.gz; \
+    chmod +x /tmp/austin; \
     set -e
 
 # Install Python dependencies
