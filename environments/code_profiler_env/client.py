@@ -1,7 +1,7 @@
 """OpenEnv client for Code Profiler Environment."""
 
 from typing import Optional, List
-from openenv import EnvClient
+from openenv.core import EnvClient
 
 from .models import (
     ProfileAction,
