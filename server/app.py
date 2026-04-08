@@ -1,13 +1,17 @@
 """FastAPI application for Code Profiler Environment - Hackathon Ready."""
 
 import sys
+import os
 import logging
 import asyncio
 import random
 import threading
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+app_dir = Path(__file__).parent.resolve()
+project_root = app_dir.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(app_dir))
 
 import uuid
 from datetime import datetime

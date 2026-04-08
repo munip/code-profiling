@@ -53,7 +53,7 @@ import sys
 from datetime import datetime
 from typing import List, Optional
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "environments", "code_profiler_env"))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from openai import OpenAI
 from models import ProfileAction, ProfileObservation, StepResult, AVAILABLE_TASKS, Task
@@ -91,7 +91,9 @@ class CodeProfilerClient:
     async def step(self, action: dict):
         return await self._request("POST", "/step", action)
 
-    async def run_full_episode(self, task_id: str, language: str, max_iterations: int = 5):
+    async def run_full_episode(
+        self, task_id: str, language: str, max_iterations: int = 5
+    ):
         """
         For full episode mode, we send the task_id and language and let the server run the entire episode inside the HF Space environment or local. This is a single call that returns the full episode results.
         In the submission HF Space for stage 1, all code is in same container, so this endpoint can be implemented to run the episode loop locally without making external calls, just for simplicity and to avoid issues with async calls from HF Space to local server.
@@ -111,9 +113,7 @@ class CodeProfilerClient:
 def format_action(action: ProfileAction) -> str:
     """Format action for logging."""
     if action.code_fix:
-        return (
-            f"{action.action_type}(language='{action.language}', fix='{action.code_fix[:30]}...')"
-        )
+        return f"{action.action_type}(language='{action.language}', fix='{action.code_fix[:30]}...')"
     return f"{action.action_type}(language='{action.language}')"
 
 
@@ -175,7 +175,9 @@ def build_agent_prompt(
     if observation.cumulative_score > 0:
         prompt_parts.append(f"\nCurrent Score: {observation.cumulative_score:.2f}")
 
-    prompt_parts.append(f"\nIteration: {observation.current_iteration}/{max_iterations}")
+    prompt_parts.append(
+        f"\nIteration: {observation.current_iteration}/{max_iterations}"
+    )
 
     if observation.current_iteration >= max_iterations:
         prompt_parts.append("\nMax iterations reached. You must submit now.")
@@ -199,14 +201,21 @@ def determine_action(
             iteration=0,
         )
 
-    if "submit" in response_lower or observation.current_iteration >= task.max_iterations - 1:
+    if (
+        "submit" in response_lower
+        or observation.current_iteration >= task.max_iterations - 1
+    ):
         return ProfileAction(
             action_type="submit",
             language=task.target_language,
             iteration=observation.current_iteration,
         )
 
-    if "fix" in response_lower or "change" in response_lower or "optimize" in response_lower:
+    if (
+        "fix" in response_lower
+        or "change" in response_lower
+        or "optimize" in response_lower
+    ):
         fix_description = extract_fix_description(response_text)
         return ProfileAction(
             action_type="fix",
@@ -226,7 +235,11 @@ def extract_fix_description(response_text: str) -> str:
     """Extract a brief description of the fix from the response."""
     lines = response_text.split("\n")
     for line in lines:
-        if "fix" in line.lower() or "change" in line.lower() or "optimize" in line.lower():
+        if (
+            "fix" in line.lower()
+            or "change" in line.lower()
+            or "optimize" in line.lower()
+        ):
             return line.strip()[:200]
     return response_text[:200] if response_text else "Applied optimization"
 
@@ -257,7 +270,13 @@ async def run_task_full(
         step_count = 0
         for i, (outcome, step_reward) in enumerate(zip(outcomes, step_rewards)):
             step_count += 1
-            status = "IMPROVE" if step_reward > 0 else "DEGRADE" if step_reward < 0 else "BASELINE"
+            status = (
+                "IMPROVE"
+                if step_reward > 0
+                else "DEGRADE"
+                if step_reward < 0
+                else "BASELINE"
+            )
             action_str = f"{outcome}(language='{task.target_language}')"
 
             print(
@@ -311,7 +330,9 @@ async def run_task_hybrid(
     print(f"[START] task={task.task_id} env={BENCHMARK} model={model_name}")
 
     try:
-        reset_response = await client.reset(task_id=task.task_id, language=task.target_language)
+        reset_response = await client.reset(
+            task_id=task.task_id, language=task.target_language
+        )
         observation_data = reset_response["observation"]
         observation = ProfileObservation(**observation_data)
 
@@ -319,7 +340,9 @@ async def run_task_hybrid(
             {"role": "system", "content": build_system_prompt(task)},
             {
                 "role": "user",
-                "content": build_agent_prompt(observation, step_count, task.max_iterations),
+                "content": build_agent_prompt(
+                    observation, step_count, task.max_iterations
+                ),
             },
         ]
 
@@ -364,7 +387,9 @@ async def run_task_hybrid(
                 messages.append(
                     {
                         "role": "user",
-                        "content": build_agent_prompt(observation, step_count, task.max_iterations),
+                        "content": build_agent_prompt(
+                            observation, step_count, task.max_iterations
+                        ),
                     }
                 )
 
@@ -376,7 +401,9 @@ async def run_task_hybrid(
                 )
                 break
 
-        final_score = observation.cumulative_score if observation.cumulative_score > 0 else 0.0
+        final_score = (
+            observation.cumulative_score if observation.cumulative_score > 0 else 0.0
+        )
         success = final_score >= 0.5
 
     except Exception as e:
@@ -483,8 +510,12 @@ async def main():
     print("TIMING SUMMARY")
     print("=" * 60)
     for timing in task_timings:
-        print(f"  {timing['task_id']}: {timing['duration_seconds']:.2f}s ({timing['steps']} steps)")
-    print(f"  Total duration to complete end-to-end run of all code profiling tasks with OpenEnv: {total_duration:.2f}s")
+        print(
+            f"  {timing['task_id']}: {timing['duration_seconds']:.2f}s ({timing['steps']} steps)"
+        )
+    print(
+        f"  Total duration to complete end-to-end run of all code profiling tasks with OpenEnv: {total_duration:.2f}s"
+    )
 
     await client.close()
 
