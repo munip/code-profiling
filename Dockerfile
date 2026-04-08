@@ -26,9 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Create startup script to download profilers at runtime (not build time)
 # This avoids network issues during Docker build in HF Spaces
-RUN echo '#!/bin/bash\n\
+RUN printf '#!/bin/bash\n\
 mkdir -p /tmp/async-profiler\n\
 if [ ! -f /tmp/async-profiler/profiler.sh ]; then\n\
+    echo "Downloading async-profiler..."\n\
     ARCH=$(uname -m)\n\
     if [ "$ARCH" = "aarch64" ]; then\n\
         wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz\n\
@@ -36,12 +37,15 @@ if [ ! -f /tmp/async-profiler/profiler.sh ]; then\n\
         wget -q -O /tmp/profiler.tar.gz https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz\n\
     fi\n\
     tar -xzf /tmp/profiler.tar.gz -C /tmp && mv /tmp/async-profiler-* /tmp/async-profiler && rm /tmp/profiler.tar.gz\n\
+    echo "async-profiler downloaded"\n\
 fi\n\
 if [ ! -f /usr/local/bin/austin ]; then\n\
+    echo "Downloading austin..."\n\
     wget -q -O /tmp/austin.tar.xz https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz\n\
     tar -xf /tmp/austin.tar.xz -C /tmp && mv /tmp/austin-*/austin /usr/local/bin/austin && chmod +x /usr/local/bin/austin && rm -rf /tmp/austin*\n\
+    echo "austin downloaded"\n\
 fi\n\
-exec "$@"' > /startup.sh && chmod +x /startup.sh
+exec "$@"\n' > /startup.sh && chmod +x /startup.sh
 
 ENV ASYNC_PROFILER_HOME=/tmp/async-profiler
 ENV PATH="/usr/local/bin:${PATH}"
