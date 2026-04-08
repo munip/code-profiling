@@ -5,6 +5,7 @@ FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=7860
 
 WORKDIR /app
 
@@ -23,4 +24,4 @@ RUN mkdir -p /app/profiles /app/logs
 
 EXPOSE 7860
 
-CMD python -m uvicorn environments.code_profiler_env.server.app:app --host 0.0.0.0 --port $PORT
+CMD ["python", "-m", "uvicorn", "environments.code_profiler_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
