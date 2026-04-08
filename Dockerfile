@@ -1,11 +1,11 @@
 # Code Profiler Environment - HuggingFace Spaces Dockerfile
 # ==========================================================
-# Supports: Python, Java, C++ profiling with real profilers( async-profiler for Java, austin for Python/C++), and simulated profiling when real profilers are not available.
+# Supports: Python, Java, C++ profiling with real profilers (async-profiler for Java, austin for Python/C++)
 # Profilers: austin (Python/C++), async-profiler (Java)
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=2
+ARG BUILD_VERSION=3
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -47,7 +47,26 @@ COPY inference.py ./
 COPY README.md ./
 COPY pyproject.toml ./
 
-RUN mkdir -p /app/profiles /app/logs /app/server/python/src /app/server/java/src/com/ecommerce/api /app/server/cpp/build /app/java_classes
+# Create directories
+RUN mkdir -p /app/profiles /app/logs /app/server/python/src \
+    /app/server/java/src/com/ecommerce/api \
+    /app/server/cpp/src /app/server/cpp/build \
+    /app/java_classes
+
+# Copy Python source
+COPY environments/code_profiler_env/templates/python/app.py /app/server/python/src/app.py
+
+# Copy Java source
+COPY environments/code_profiler_env/templates/java/ECommerceAPI.java /app/server/java/src/com/ecommerce/api/ECommerceAPI.java
+
+# Copy C++ source
+COPY environments/code_profiler_env/templates/cpp/main.cpp /app/server/cpp/src/main.cpp
+
+# Compile Java (needs to be run from src/ to match package structure)
+RUN cd /app/server/java/src && javac -d /app/java_classes com/ecommerce/api/ECommerceAPI.java || echo "Java compilation skipped"
+
+# Compile C++
+RUN g++ -O0 -o /app/server/cpp/build/ecommerce_api /app/server/cpp/src/main.cpp || echo "C++ compilation skipped"
 
 EXPOSE 7860
 
