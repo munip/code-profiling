@@ -295,16 +295,28 @@ async def startup_event():
             import glob
 
             dirs = glob.glob("/tmp/async-profiler-*")
+            logger.info(f"Extracted async-profiler dirs: {dirs}")
             if dirs:
                 # If /tmp/async-profiler exists, merge contents
                 if Path("/tmp/async-profiler").exists():
                     import shutil
 
                     for item in Path(dirs[0]).iterdir():
-                        shutil.move(str(item), "/tmp/async-profiler/")
+                        dest = Path("/tmp/async-profiler") / item.name
+                        if item.is_dir():
+                            if dest.exists():
+                                shutil.rmtree(dest, ignore_errors=True)
+                            shutil.copytree(item, dest)
+                        else:
+                            shutil.copy(item, dest)
                     shutil.rmtree(dirs[0], ignore_errors=True)
                 else:
                     subprocess.run(["mv", dirs[0], "/tmp/async-profiler"], check=True)
+
+            # Verify async-profiler is in place
+            logger.info(
+                f"Contents of /tmp/async-profiler: {list(Path('/tmp/async-profiler').iterdir()) if Path('/tmp/async-profiler').exists() else 'NOT FOUND'}"
+            )
             Path("/tmp/profiler.tar.gz").unlink(missing_ok=True)
             logger.info("async-profiler downloaded")
         except Exception as e:
@@ -314,28 +326,45 @@ async def startup_event():
         logger.info("Downloading austin...")
         try:
             url = "https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz"
+            Path("/tmp").mkdir(exist_ok=True)
             urllib.request.urlretrieve(url, "/tmp/austin.tar.xz")
+
+            # List what's in /tmp before extraction
+            import glob
+
+            before = set(glob.glob("/tmp/*"))
+
             subprocess.run(
                 ["tar", "-xJf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
             )
-            # Find and move the extracted austin binary
-            import glob
 
-            dirs = glob.glob("/tmp/austin-*")
+            # List what's in /tmp after extraction
+            after = set(glob.glob("/tmp/*"))
+            new_items = after - before
+            logger.info(f"Extracted files/dirs: {new_items}")
+
+            # Find the austin binary
             found = False
-            for d in dirs:
-                austin_bin = Path(d) / "austin"
-                if austin_bin.exists():
-                    import shutil
+            for pattern in ["/tmp/austin", "/tmp/austin-*", "/tmp/bin/austin"]:
+                for path in glob.glob(pattern):
+                    p = Path(path)
+                    if p.is_file():
+                        logger.info(f"Found austin at: {path}")
+                        import shutil
 
-                    Path("/usr/local/bin").mkdir(exist_ok=True)
-                    shutil.copy(austin_bin, "/usr/local/bin/austin")
-                    Path("/usr/local/bin/austin").chmod(0o755)
-                    shutil.rmtree(d, ignore_errors=True)
-                    found = True
+                        Path("/usr/local/bin").mkdir(exist_ok=True)
+                        shutil.copy(path, "/usr/local/bin/austin")
+                        Path("/usr/local/bin/austin").chmod(0o755)
+                        logger.info("austin copied to /usr/local/bin/austin")
+                        found = True
+                        break
+                if found:
                     break
+
             if not found:
                 logger.warning("austin binary not found in extracted archive")
+                # Debug: list all files in /tmp
+                logger.warning(f"Files in /tmp: {list(glob.glob('/tmp/*'))}")
             Path("/tmp/austin.tar.xz").unlink(missing_ok=True)
             if found:
                 logger.info("austin downloaded")
