@@ -9,6 +9,7 @@ import uuid
 
 class TaskDifficulty(str, Enum):
     """Task difficulty levels for grading."""
+
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -16,6 +17,7 @@ class TaskDifficulty(str, Enum):
 
 class TaskType(str, Enum):
     """Types of profiling tasks."""
+
     STRING_CONCATENATION = "string_concatenation"
     LINEAR_SEARCH = "linear_search"
     MEMORY_OPTIMIZATION = "memory_optimization"
@@ -23,6 +25,7 @@ class TaskType(str, Enum):
 
 class GradingCriteria(BaseModel):
     """Grading criteria for a task."""
+
     metric: str = Field(description="Metric being graded (e.g., execution_time, memory_usage)")
     target: float = Field(description="Target value for full score")
     threshold: float = Field(description="Acceptable threshold")
@@ -31,6 +34,7 @@ class GradingCriteria(BaseModel):
 
 class Task(BaseModel):
     """Definition of a profiling task."""
+
     task_id: str = Field(description="Unique task identifier")
     name: str = Field(description="Human-readable task name")
     description: str = Field(description="Detailed task description")
@@ -44,6 +48,7 @@ class Task(BaseModel):
 
 class Hotspot(BaseModel):
     """Represents a performance hotspot identified by profiler."""
+
     function_name: str = Field(description="Name of the function with hotspot")
     file_path: Optional[str] = Field(default=None, description="File containing the hotspot")
     line_number: Optional[int] = Field(default=None, description="Line number of hotspot")
@@ -55,12 +60,15 @@ class Hotspot(BaseModel):
 
 class IterationResult(BaseModel):
     """Results from a single profiling iteration."""
+
     iteration: int = Field(ge=0, le=5)
     language: str = Field(description="Programming language: java, python, or cpp")
     build_success: bool = Field(default=False, description="Whether build succeeded")
     profiler_output: Optional[str] = Field(default=None, description="Raw profiler output")
     hotspots: List[Hotspot] = Field(default_factory=list, description="Identified hotspots")
-    execution_time_ms: float = Field(default=0.0, description="Average execution time in milliseconds")
+    execution_time_ms: float = Field(
+        default=0.0, description="Average execution time in milliseconds"
+    )
     memory_usage_mb: float = Field(default=0.0, description="Memory usage in MB")
     reward: float = Field(default=0.0, description="Step reward (normalized 0.0-1.0)")
     cumulative_score: float = Field(default=0.0, description="Cumulative task score (0.0-1.0)")
@@ -71,6 +79,7 @@ class IterationResult(BaseModel):
 
 class ProfileAction(BaseModel):
     """Actions that can be taken in the code profiler environment."""
+
     action_type: Literal["build", "profile", "fix", "test", "submit"] = Field(
         description="Type of action to perform"
     )
@@ -80,20 +89,24 @@ class ProfileAction(BaseModel):
     test_input: Optional[str] = Field(
         default=None, description="Test input for profiling (for profile action)"
     )
-    reasoning: Optional[str] = Field(
-        default=None, description="Agent's reasoning for the action"
-    )
+    reasoning: Optional[str] = Field(default=None, description="Agent's reasoning for the action")
 
 
 class ProfileObservation(BaseModel):
     """Observation returned after each step."""
+
     build_status: bool = Field(default=False, description="Whether the build succeeded")
     build_output: Optional[str] = Field(default=None, description="Build output/error messages")
     profiler_output: Optional[str] = Field(default=None, description="Raw profiler output")
-    hotspots: List[Hotspot] = Field(default_factory=list, description="Identified performance hotspots")
+    hotspots: List[Hotspot] = Field(
+        default_factory=list, description="Identified performance hotspots"
+    )
     execution_time_ms: float = Field(default=0.0, description="Execution time in milliseconds")
     memory_usage_mb: float = Field(default=0.0, description="Memory usage in MB")
     reward: float = Field(default=0.0, description="Step reward (normalized 0.0-1.0)")
+    step_reward: float = Field(
+        default=0.0, description="Delta reward from previous step (normalized 0.0-1.0)"
+    )
     cumulative_score: float = Field(default=0.0, description="Cumulative task score (0.0-1.0)")
     delta_percent: float = Field(default=0.0, description="Percentage change from baseline")
     done: bool = Field(default=False, description="Whether episode is complete")
@@ -107,15 +120,19 @@ class ProfileObservation(BaseModel):
 
 class GraderResult(BaseModel):
     """Result from the grading function."""
+
     score: float = Field(ge=0.0, le=1.0, description="Normalized score (0.0-1.0)")
     passed: bool = Field(description="Whether task passed")
     metrics: Dict[str, float] = Field(default_factory=dict, description="Detailed metrics")
     feedback: str = Field(default="", description="Grader feedback")
-    breakdown: List[Dict[str, Any]] = Field(default_factory=list, description="Score breakdown by criteria")
+    breakdown: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Score breakdown by criteria"
+    )
 
 
 class ProfileState(BaseModel):
     """State of the environment."""
+
     episode_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     step_count: int = Field(default=0, description="Number of steps taken")
     language: str = Field(default="python", description="Current language")
@@ -125,6 +142,9 @@ class ProfileState(BaseModel):
     best_performance_ms: float = Field(default=float("inf"), description="Best execution time seen")
     baseline_memory_mb: float = Field(default=0.0, description="Baseline memory usage")
     best_memory_mb: float = Field(default=float("inf"), description="Best memory usage")
+    previous_cumulative_score: float = Field(
+        default=0.0, description="Previous cumulative score for step reward calculation"
+    )
     iteration_results: List[IterationResult] = Field(default_factory=list)
     is_complete: bool = Field(default=False)
     final_score: float = Field(default=0.0, description="Final task score (0.0-1.0)")
@@ -132,6 +152,7 @@ class ProfileState(BaseModel):
 
 class StepResult(BaseModel):
     """Combined result from a step operation."""
+
     observation: ProfileObservation
     state: ProfileState
     grader_result: Optional[GraderResult] = None
@@ -139,6 +160,7 @@ class StepResult(BaseModel):
 
 class ResetResponse(BaseModel):
     """Response from reset endpoint."""
+
     observation: ProfileObservation
     state: ProfileState
     available_tasks: List[Task] = Field(default_factory=list, description="All available tasks")
@@ -149,7 +171,7 @@ AVAILABLE_TASKS = [
         task_id="python-string-concat-easy",
         name="Fix String Concatenation (Python)",
         description="The e-commerce API has string concatenation in loops causing slow responses. "
-                    "Fix the build_catalog_response function to use efficient string building.",
+        "Fix the build_catalog_response function to use efficient string building.",
         difficulty=TaskDifficulty.EASY,
         task_type=TaskType.STRING_CONCATENATION,
         target_language="python",
@@ -161,13 +183,13 @@ AVAILABLE_TASKS = [
         hints=[
             "Use string join() or f-strings instead of + operator in loops",
             "Pre-allocate string builder if using manual concatenation",
-        ]
+        ],
     ),
     Task(
         task_id="python-linear-search-medium",
         name="Fix Linear Search (Python)",
         description="The product search uses O(n) linear search. Optimize find_product_by_id_linear "
-                    "to use dictionary/hash lookup for O(1) access.",
+        "to use dictionary/hash lookup for O(1) access.",
         difficulty=TaskDifficulty.MEDIUM,
         task_type=TaskType.LINEAR_SEARCH,
         target_language="python",
@@ -179,13 +201,13 @@ AVAILABLE_TASKS = [
         hints=[
             "Use a dictionary to cache products by ID",
             "Build index on first access, then O(1) lookups",
-        ]
+        ],
     ),
     Task(
         task_id="cpp-memory-optimization-hard",
         name="Fix Memory Optimization (C++)",
         description="The C++ implementation has memory allocation issues and excessive copies. "
-                    "Optimize to reduce memory churn and improve cache locality.",
+        "Optimize to reduce memory churn and improve cache locality.",
         difficulty=TaskDifficulty.HARD,
         task_type=TaskType.MEMORY_OPTIMIZATION,
         target_language="cpp",
@@ -199,7 +221,7 @@ AVAILABLE_TASKS = [
             "Use move semantics to avoid copies",
             "Pre-allocate vectors instead of push_back in loops",
             "Consider using string_view instead of string copies",
-        ]
+        ],
     ),
 ]
 

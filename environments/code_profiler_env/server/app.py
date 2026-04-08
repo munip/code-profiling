@@ -2,6 +2,8 @@
 
 import sys
 import logging
+import asyncio
+import random
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -35,6 +37,16 @@ from models import (
     TaskDifficulty,
     TaskType,
 )
+
+
+from rl_components import (
+    IterationResult as RLIterationResult,
+    GitManager,
+    CodeFixer,
+    ContainerManager,
+    OutcomeDeterminer,
+)
+from report_generator import ReportGenerator, create_episode_report, IterationRecord
 
 
 class PerformanceGrader:
@@ -160,6 +172,50 @@ class PerformanceGrader:
             return f"Task incomplete. Need improvement on: {', '.join(metric_names)}. Current score: {score:.2f}"
 
         return f"Task in progress. Current score: {score:.2f}"
+
+
+class RunEpisodeRequest(BaseModel):
+    """Request model for running a full RL episode."""
+
+    task_id: Optional[str] = Field(default=None, description="Task ID to run")
+    language: str = Field(default="python", description="Target programming language")
+    max_iterations: int = Field(default=5, ge=1, le=7, description="Maximum iterations (1-7)")
+    execution_mode: str = Field(default="full", description="Execution mode: full or hybrid")
+
+
+class EpisodeIterationResponse(BaseModel):
+    """Response for a single iteration in the episode."""
+
+    iteration: int
+    outcome: str
+    execution_time_ms: float
+    delta_percent: float
+    reward: float
+    step_reward: float
+    status: str
+    rebuilt: bool = False
+    tag: str = ""
+
+
+class RunEpisodeResponse(BaseModel):
+    """Response from running a full RL episode."""
+
+    episode_id: str
+    task_id: str
+    language: str
+    baseline_ms: float
+    final_ms: float
+    improvement_percent: float
+    iterations_completed: int
+    outcomes: List[str]
+    rebuild_tags: List[str]
+    rewards: List[float]
+    step_rewards: List[float]
+    total_reward: float
+    score: float
+    success: bool
+    report: str
+    done: bool
 
 
 app = FastAPI(
@@ -460,6 +516,8 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
 
         reward = grader_result.score
         cumulative_score = grader_result.score
+        step_reward = cumulative_score - state.previous_cumulative_score
+        step_reward = max(0.0, min(1.0, step_reward))
 
         iteration_result = IterationResult(
             iteration=state.current_iteration,
@@ -475,6 +533,7 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             fix_applied=action.code_fix,
         )
         state.iteration_results.append(iteration_result)
+        state.previous_cumulative_score = cumulative_score
 
         done = state.current_iteration >= state.current_task.max_iterations
 
@@ -489,7 +548,8 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             hotspots=hotspots,
             execution_time_ms=execution_time_ms,
             memory_usage_mb=memory_mb,
-            reward=reward,
+            reward=step_reward,
+            step_reward=step_reward,
             cumulative_score=cumulative_score,
             delta_percent=delta_percent,
             done=done,
@@ -700,6 +760,209 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         pass
+
+
+@app.post("/run_full_episode", response_model=RunEpisodeResponse)
+async def run_full_episode(request: RunEpisodeRequest):
+    """
+    Run a full RL episode with 5-7 iterations.
+
+    This endpoint runs the complete RL loop:
+    1. Reset to baseline
+    2. Run 5-7 iterations with outcomes (ensure 2 improve + 2 degrade)
+    3. Rebuild container on improvements
+    4. Generate improvement report
+    """
+    logger.info(
+        f"[EPISODE] Starting full episode - task: {request.task_id}, lang: {request.language}"
+    )
+
+    task = TASK_MAP.get(request.task_id) if request.task_id else AVAILABLE_TASKS[0]
+    if not task:
+        return RunEpisodeResponse(
+            episode_id=str(uuid.uuid4()),
+            task_id=request.task_id or "",
+            language=request.language,
+            baseline_ms=0.0,
+            final_ms=0.0,
+            improvement_percent=0.0,
+            iterations_completed=0,
+            outcomes=[],
+            rebuild_tags=[],
+            rewards=[],
+            step_rewards=[],
+            total_reward=0.0,
+            score=0.0,
+            success=False,
+            report="Error: Task not found",
+            done=True,
+        )
+
+    reset_response = reset_env(task_id=task.task_id, language=request.language)
+    baseline_ms = reset_response.state.baseline_performance_ms
+
+    outcome_history: List[str] = []
+    iteration_responses: List[EpisodeIterationResponse] = []
+    rebuild_tags: List[str] = []
+    version_tag = 1
+    net_positive_achieved = False
+    extension_count = 0
+    last_improved_sha = ""
+
+    outcome_determiner = OutcomeDeterminer()
+    code_fixer = CodeFixer()
+    git_manager = GitManager()
+    report_gen = ReportGenerator()
+
+    iteration_0_response = EpisodeIterationResponse(
+        iteration=0,
+        outcome="baseline",
+        execution_time_ms=baseline_ms,
+        delta_percent=0.0,
+        reward=0.0,
+        step_reward=0.0,
+        status="BASELINE",
+        rebuilt=False,
+        tag="",
+    )
+    iteration_responses.append(iteration_0_response)
+    outcome_history.append("baseline")
+
+    max_iter = min(request.max_iterations, 7)
+
+    for iteration in range(1, max_iter + 3):
+        if iteration > max_iter:
+            if net_positive_achieved:
+                break
+            elif extension_count >= 2:
+                break
+            else:
+                extension_count += 1
+                logger.info(f"[EPISODE] Extension iteration {iteration}")
+        else:
+            logger.info(f"[EPISODE] Iteration {iteration}")
+
+        outcome = outcome_determiner.determine_outcome(outcome_history)
+        outcome_history.append(outcome)
+
+        if outcome == "improve":
+            code_fixer.apply_optimized(request.language)
+            message = f"iteration {iteration}: {outcome}"
+            commit_sha = git_manager.commit(message)
+        elif outcome == "degrade":
+            code_fixer.apply_degraded(request.language)
+            message = f"iteration {iteration}: {outcome}"
+            commit_sha = git_manager.commit(message)
+        elif outcome == "remove":
+            if last_improved_sha:
+                code_fixer.apply_optimized(request.language)
+            message = f"iteration {iteration}: {outcome}"
+            commit_sha = git_manager.commit(message)
+        else:
+            message = f"iteration {iteration}: {outcome}"
+            commit_sha = git_manager.commit(message)
+
+        rebuilt = False
+        tag = ""
+        if outcome == "improve":
+            version_tag += 1
+            tag = f"{request.language}-v{version_tag}"
+            logger.info(f"[EPISODE] Rebuilding container with tag {tag}")
+            rebuilt = ContainerManager.rebuild(request.language, version_tag)
+            if rebuilt:
+                rebuild_tags.append(tag)
+                last_improved_sha = commit_sha
+
+        await asyncio.sleep(0.5)
+
+        action = ProfileAction(
+            action_type="profile",
+            language=request.language,
+            iteration=iteration,
+        )
+        step_result = step_env(action)
+
+        obs = step_result.observation
+        delta_percent = obs.delta_percent
+        step_reward = obs.step_reward
+        reward = obs.cumulative_score
+        status = "IMPROVE" if step_reward > 0 else "DEGRADE"
+
+        if step_reward > 0 and not net_positive_achieved:
+            net_positive_achieved = True
+            logger.info(f"[EPISODE] Net positive achieved!")
+
+        iter_response = EpisodeIterationResponse(
+            iteration=iteration,
+            outcome=outcome,
+            execution_time_ms=obs.execution_time_ms,
+            delta_percent=delta_percent,
+            reward=reward,
+            step_reward=step_reward,
+            status=status,
+            rebuilt=rebuilt,
+            tag=tag,
+        )
+        iteration_responses.append(iter_response)
+
+        if iteration >= max_iter and net_positive_achieved:
+            logger.info(f"[EPISODE] Stopping at iteration {iteration} - net positive achieved")
+            break
+
+    final_ms = iteration_responses[-1].execution_time_ms if iteration_responses else baseline_ms
+    improvement_percent = ((baseline_ms - final_ms) / baseline_ms * 100) if baseline_ms > 0 else 0
+
+    total_reward = sum(r.step_reward for r in iteration_responses[1:])
+    score = iteration_responses[-1].reward if iteration_responses else 0.0
+    success = total_reward > 0.5
+
+    iteration_records = [
+        IterationRecord(
+            iteration=r.iteration,
+            outcome=r.outcome,
+            delta_percent=r.delta_percent,
+            rebuilt=r.rebuilt,
+            tag=r.tag,
+            status=r.status,
+            execution_time_ms=r.execution_time_ms,
+            reward=r.reward,
+        )
+        for r in iteration_responses
+    ]
+
+    episode_report = create_episode_report(
+        language=request.language,
+        baseline_ms=baseline_ms,
+        final_ms=final_ms,
+        iterations=iteration_records,
+        before_code=CodeFixer.BASELINE_CODE.get(request.language, ""),
+        after_code=CodeFixer.OPTIMIZED_CODE.get(request.language, ""),
+        rebuild_tags=rebuild_tags,
+        total_reward=total_reward,
+    )
+
+    report_content = report_gen.generate_report(episode_report)
+
+    logger.info(f"[EPISODE] Episode complete - score: {score:.2f}, reward: {total_reward:.3f}")
+
+    return RunEpisodeResponse(
+        episode_id=str(uuid.uuid4()),
+        task_id=task.task_id,
+        language=request.language,
+        baseline_ms=baseline_ms,
+        final_ms=final_ms,
+        improvement_percent=improvement_percent,
+        iterations_completed=len(iteration_responses) - 1,
+        outcomes=[r.outcome for r in iteration_responses],
+        rebuild_tags=rebuild_tags,
+        rewards=[r.reward for r in iteration_responses],
+        step_rewards=[r.step_reward for r in iteration_responses],
+        total_reward=total_reward,
+        score=score,
+        success=success,
+        report=report_content,
+        done=True,
+    )
 
 
 if __name__ == "__main__":

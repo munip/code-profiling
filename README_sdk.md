@@ -120,6 +120,23 @@ Rewards are normalized scores (0.0-1.0) based on:
 - Hotspot percentage reduction
 - Iteration efficiency bonus
 
+## Flow
+Local Loop (5-7 iterations of improvements or degradation in performance):
+  ├── reset() → HF Space
+  ├── For each iteration:
+  │   ├── LLM analyzes hotspots → HF Router
+  │   ├── Apply fix locally
+  │   ├── commit git
+  │   ├── Docker rebuild (if performance improves)
+  │   ├── profile() → measure
+  │   └── calculate delta reward
+  └── Generate report locally
+## Stop Conditions (5-7 iterations):
+
+  Stop at iteration 5 if net_positive achieved
+  Up to 2 extensions if iteration 5 is degrade
+  Always stop after iteration 7
+
 ## License
 
 MIT
