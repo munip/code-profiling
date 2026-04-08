@@ -157,7 +157,14 @@ class PythonProfiler:
                     output=output,
                 )
             else:
-                error_msg = result.stderr.decode() if result.stderr else "austin failed"
+                try:
+                    error_msg = (
+                        result.stderr.decode("utf-8", errors="replace")
+                        if result.stderr
+                        else "austin failed"
+                    )
+                except Exception:
+                    error_msg = "austin failed with encoding error"
                 logger.warning(f"austin failed: {error_msg}, falling back to simulated")
                 return PythonProfiler._fallback_profile(execution_time)
 
@@ -652,7 +659,14 @@ class CppProfiler:
                     output=output[:1000],
                 )
             else:
-                error_msg = result.stderr.decode() if result.stderr else "austin failed"
+                try:
+                    error_msg = (
+                        result.stderr.decode("utf-8", errors="replace")
+                        if result.stderr
+                        else "austin failed"
+                    )
+                except Exception:
+                    error_msg = "austin failed with encoding error"
                 logger.warning(
                     f"austin failed: {error_msg}, measuring actual C++ execution time"
                 )
