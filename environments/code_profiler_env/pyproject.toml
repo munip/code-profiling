@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "code-profiler-env"
+version = "0.1.0"
+description = "OpenEnv environment for code profiling and performance optimization"
+readme = "../../README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Code Profiling Team" }
+]
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.25.0",
+    "openai>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/munipu/code-profiler-env"
+Documentation = "https://meta-pytorch.org/OpenEnv/"
+Repository = "https://github.com/munipu/code-profiler-env"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "server/",
+    "models.py",
+    "openenv.yaml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]

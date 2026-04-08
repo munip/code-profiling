@@ -19,7 +19,8 @@ model_index:
 
 # Code Profiler Environment
 
-An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks based on pcode profiler runs. To start with support is available for Python, Java, and C++ code.
+An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks based on code profiler runs. To start with support is available for Python, Java, and C++ code. Currently, async_profiler are used as profilers for Java and austin for Python and C++.
+
 
 ## Overview
 
@@ -29,6 +30,11 @@ This environment simulates real-world code profiling tasks where agents must:
 2. **Profile** the code to identify performance hotspots
 3. **Fix** identified issues
 4. **Measure** improvement with graded rewards
+
+## Environment Note
+Currently all three code generation environment build-outs happen in the same container along with the runner environment to pack into the same HF Spaces. 
+There is a sample docker-compose included for simulating true multi-agent, multi-environment scenario of different code bases( say of different micr-services of an application) running in their own containers / HF Spaces. A common openenv environment can help coordinate this. 
+This is especially useful for large scale porting or migration exercises. 
 
 ## Tasks
 
@@ -136,6 +142,56 @@ Local Loop (5-7 iterations of improvements or degradation in performance):
   Stop at iteration 5 if net_positive achieved
   Up to 2 extensions if iteration 5 is degrade
   Always stop after iteration 7
+
+## Sample output of inference.py run
+When '''python inference.py''' is run, we sshould see something like:
+'''Running inference with model: Qwen/Qwen2.5-72B-Instruct
+API Base URL: https://router.huggingface.co/v1
+Environment: https://munipu-openenv-stage1.hf.space
+Execution Mode: full
+
+
+============================================================
+Running task: Fix String Concatenation (Python) (easy)
+============================================================
+[START] task=python-string-concat-easy env=code-profiler model=Qwen/Qwen2.5-72B-Instruct
+[STEP]  step=1 action=baseline(language='python') reward=0.00 done=false error=null
+[STEP]  step=2 action=improve(language='python') reward=0.74 done=false error=null
+[STEP]  step=3 action=degrade(language='python') reward=0.00 done=false error=null     
+[STEP]  step=4 action=remove(language='python') reward=0.00 done=true error=null       
+[END]   success=true steps=4 score=0.70 rewards=0.00,0.74,0.72,0.70
+
+============================================================
+Running task: Fix Linear Search (Python) (medium)
+============================================================
+[START] task=python-linear-search-medium env=code-profiler model=Qwen/Qwen2.5-72B-Instruct
+[STEP]  step=1 action=baseline(language='python') reward=0.00 done=false error=null
+[STEP]  step=2 action=improve(language='python') reward=0.84 done=false error=null
+[STEP]  step=3 action=improve(language='python') reward=0.00 done=false error=null     
+[STEP]  step=4 action=degrade(language='python') reward=0.00 done=false error=null     
+[STEP]  step=5 action=remove(language='python') reward=0.00 done=true error=null       
+[END]   success=true steps=5 score=0.78 rewards=0.00,0.84,0.82,0.80,0.78
+
+============================================================
+Running task: Fix Memory Optimization (C++) (hard)
+============================================================
+[START] task=cpp-memory-optimization-hard env=code-profiler model=Qwen/Qwen2.5-72B-Instruct
+[STEP]  step=1 action=baseline(language='cpp') reward=0.00 done=false error=null
+[STEP]  step=2 action=degrade(language='cpp') reward=0.52 done=false error=null
+[STEP]  step=3 action=remove(language='cpp') reward=0.00 done=false error=null
+[STEP]  step=4 action=remove(language='cpp') reward=0.00 done=false error=null
+[STEP]  step=5 action=improve(language='cpp') reward=0.00 done=false error=null        
+[STEP]  step=6 action=degrade(language='cpp') reward=0.00 done=true error=null
+[END]   success=true steps=6 score=0.52 rewards=0.00,0.52,0.52,0.52,0.52,0.52
+
+============================================================
+FINAL RESULTS
+============================================================
+python-string-concat-easy: PASS - Score: 0.70 - Steps: 4
+python-linear-search-medium: PASS - Score: 0.78 - Steps: 5
+cpp-memory-optimization-hard: PASS - Score: 0.52 - Steps: 6
+
+Average Score: 0.67'''
 
 ## License
 
