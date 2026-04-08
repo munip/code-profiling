@@ -304,9 +304,21 @@ class CodeFixer:
 
     def read_source(self, language: str) -> str:
         """Read source file for a language."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         path = self.source_paths.get(language)
-        if path and path.exists():
-            return path.read_text()
+        if path:
+            logger.info(f"[CODEFIX] Looking for source at: {path}")
+            if path.exists():
+                content = path.read_text()
+                logger.info(f"[CODEFIX] Read {len(content)} bytes from {path}")
+                return content
+            else:
+                logger.error(f"[CODEFIX] Source file not found: {path}")
+        else:
+            logger.error(f"[CODEFIX] No path configured for language={language}")
         return ""
 
     def save_baseline(self, language: str):
@@ -358,8 +370,14 @@ class CodeFixer:
 
     def apply_code(self, language: str, new_code: str) -> bool:
         """Apply new code to a language's source file."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         code = self.read_source(language)
         if not code:
+            logger.error(f"[CODEFIX] No source code read for language={language}")
+            logger.error(f"[CODEFIX] source_paths: {self.source_paths}")
             return False
 
         if language == "python":
@@ -371,13 +389,19 @@ class CodeFixer:
 
         start, end = self.find_function_range(code, func_sig, language)
         if start == -1:
+            logger.error(
+                f"[CODEFIX] Function not found: {func_sig} in language={language}"
+            )
+            logger.error(f"[CODEFIX] Source preview: {code[:500]}...")
             return False
 
         new_file_code = code[:start] + new_code + code[end:]
         path = self.source_paths.get(language)
         if path:
             path.write_text(new_file_code)
+            logger.info(f"[CODEFIX] Successfully applied code to {path}")
             return True
+        logger.error(f"[CODEFIX] No path configured for language={language}")
         return False
 
     def apply_baseline(self, language: str) -> bool:

@@ -57,11 +57,49 @@ class ProfileResult:
     error: Optional[str] = None
 
 
+def measure_console_execution_time(
+    cmd: List[str], warmup_runs: int = 1, measure_runs: int = 3
+) -> float:
+    """
+    Measure actual execution time for a console application.
+
+    Args:
+        cmd: Command to run as list of strings
+        warmup_runs: Number of warmup runs before measuring
+        measure_runs: Number of runs to average
+
+    Returns:
+        Average execution time in milliseconds
+    """
+    execution_times = []
+
+    # Warmup runs
+    for _ in range(warmup_runs):
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=10)
+        except Exception:
+            pass
+
+    # Measure runs
+    for _ in range(measure_runs):
+        try:
+            start = time.time()
+            subprocess.run(cmd, capture_output=True, timeout=10)
+            elapsed = (time.time() - start) * 1000  # Convert to ms
+            execution_times.append(elapsed)
+        except Exception:
+            pass
+
+    return sum(execution_times) / len(execution_times) if execution_times else 0.0
+
+
 class PythonProfiler:
     """Profiler for Python code using austin frame sampler."""
 
     @staticmethod
-    def profile_with_austin(script_path: str = None, duration: int = 5) -> ProfileResult:
+    def profile_with_austin(
+        script_path: str = None, duration: int = 5
+    ) -> ProfileResult:
         """
         Profile Python script using austin frame sampler.
 
@@ -85,13 +123,26 @@ class PythonProfiler:
             output_file = f.name
 
         try:
+            # First measure actual execution time by making requests
+            avg_time = PythonProfiler.profile_request(
+                duration=min(duration, 3)
+            ).execution_time_ms
+
             result = subprocess.run(
-                ["austin", "-x", str(duration), "-o", output_file, "python", script_path],
+                [
+                    "austin",
+                    "-x",
+                    str(duration),
+                    "-o",
+                    output_file,
+                    "python",
+                    script_path,
+                ],
                 capture_output=True,
                 timeout=duration + 30,
             )
 
-            execution_time = duration * 1000.0
+            execution_time = avg_time if avg_time > 0 else duration * 1000.0
 
             if result.returncode == 0 and os.path.exists(output_file):
                 with open(output_file) as f:
@@ -111,18 +162,30 @@ class PythonProfiler:
                 return PythonProfiler._fallback_profile(execution_time)
 
         except FileNotFoundError:
-            logger.warning("austin not found, falling back to simulated profiling")
-            return PythonProfiler._fallback_profile(duration * 1000.0)
+            logger.warning("austin not found, measuring actual execution time")
+            # Measure actual execution time via HTTP requests
+            measured_result = PythonProfiler.profile_request(duration=min(duration, 3))
+            return PythonProfiler._fallback_profile(
+                measured_result.execution_time_ms
+                if measured_result.execution_time_ms > 0
+                else duration * 1000.0
+            )
         except subprocess.TimeoutExpired:
-            return ProfileResult(
-                success=False,
-                execution_time_ms=duration * 1000.0,
-                hotspots=[],
-                error="Profile timed out",
+            logger.warning("austin timed out, measuring actual execution time")
+            measured_result = PythonProfiler.profile_request(duration=min(duration, 3))
+            return PythonProfiler._fallback_profile(
+                measured_result.execution_time_ms
+                if measured_result.execution_time_ms > 0
+                else duration * 1000.0
             )
         except Exception as e:
-            logger.warning(f"austin error: {e}, falling back to simulated")
-            return PythonProfiler._fallback_profile(duration * 1000.0)
+            logger.warning(f"austin error: {e}, measuring actual execution time")
+            measured_result = PythonProfiler.profile_request(duration=min(duration, 3))
+            return PythonProfiler._fallback_profile(
+                measured_result.execution_time_ms
+                if measured_result.execution_time_ms > 0
+                else duration * 1000.0
+            )
         finally:
             if os.path.exists(output_file):
                 os.unlink(output_file)
@@ -151,7 +214,9 @@ class PythonProfiler:
                     "__libc_start_main",
                 ):
                     func_name = (
-                        stack.split(";")[-2].strip() if len(stack.split(";")) > 1 else func_name
+                        stack.split(";")[-2].strip()
+                        if len(stack.split(";")) > 1
+                        else func_name
                     )
 
                 hotspots.append(
@@ -186,7 +251,9 @@ class PythonProfiler:
         )
 
     @staticmethod
-    def profile_request(port: int = PYTHON_API_PORT, duration: int = 5) -> ProfileResult:
+    def profile_request(
+        port: int = PYTHON_API_PORT, duration: int = 5
+    ) -> ProfileResult:
         """Profile Python Flask API by making requests and measuring time."""
         import httpx
 
@@ -195,7 +262,9 @@ class PythonProfiler:
             for _ in range(duration * 2):
                 req_start = time.time()
                 try:
-                    response = httpx.get(f"http://localhost:{port}/catalog", timeout=5.0)
+                    response = httpx.get(
+                        f"http://localhost:{port}/catalog", timeout=5.0
+                    )
                     req_time = (time.time() - req_start) * 1000
                     if response.status_code == 200:
                         execution_times.append(req_time)
@@ -203,7 +272,9 @@ class PythonProfiler:
                     pass
                 time.sleep(0.5)
 
-            avg_time = sum(execution_times) / len(execution_times) if execution_times else 0.0
+            avg_time = (
+                sum(execution_times) / len(execution_times) if execution_times else 0.0
+            )
             hotspots = PythonProfiler._generate_hotspots(avg_time)
 
             return ProfileResult(
@@ -305,7 +376,13 @@ class JavaProfiler:
         pid = JavaProfiler._ensure_java_running()
 
         if pid is None:
-            return JavaProfiler._fallback_profile(5000.0)
+            # Measure actual Java execution time
+            avg_time = measure_console_execution_time(
+                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+                warmup_runs=1,
+                measure_runs=3,
+            )
+            return JavaProfiler._fallback_profile(avg_time if avg_time > 0 else 5000.0)
 
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
             output_file = f.name
@@ -339,23 +416,55 @@ class JavaProfiler:
                     output=output[:1000],
                 )
             else:
-                error_msg = result.stderr.decode() if result.stderr else "async-profiler failed"
-                logger.warning(f"async-profiler failed: {error_msg}")
-                return JavaProfiler._fallback_profile(duration * 1000.0)
+                error_msg = (
+                    result.stderr.decode() if result.stderr else "async-profiler failed"
+                )
+                logger.warning(
+                    f"async-profiler failed: {error_msg}, measuring actual time"
+                )
+                avg_time = measure_console_execution_time(
+                    ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+                    warmup_runs=1,
+                    measure_runs=3,
+                )
+                return JavaProfiler._fallback_profile(
+                    avg_time if avg_time > 0 else duration * 1000.0
+                )
 
         except subprocess.TimeoutExpired:
+            avg_time = measure_console_execution_time(
+                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+                warmup_runs=1,
+                measure_runs=3,
+            )
             return ProfileResult(
                 success=False,
-                execution_time_ms=duration * 1000.0,
+                execution_time_ms=avg_time if avg_time > 0 else duration * 1000.0,
                 hotspots=[],
                 error="Profile timed out",
             )
         except FileNotFoundError:
-            logger.warning("async-profiler not found, using simulated profiling")
-            return JavaProfiler._fallback_profile(duration * 1000.0)
+            logger.warning(
+                "async-profiler not found, measuring actual Java execution time"
+            )
+            avg_time = measure_console_execution_time(
+                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+                warmup_runs=1,
+                measure_runs=3,
+            )
+            return JavaProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
+            )
         except Exception as e:
-            logger.warning(f"async-profiler error: {e}")
-            return JavaProfiler._fallback_profile(duration * 1000.0)
+            logger.warning(f"async-profiler error: {e}, measuring actual time")
+            avg_time = measure_console_execution_time(
+                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+                warmup_runs=1,
+                measure_runs=3,
+            )
+            return JavaProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
+            )
         finally:
             if os.path.exists(output_file):
                 os.unlink(output_file)
@@ -384,7 +493,11 @@ class JavaProfiler:
                             if parts[1].strip().replace(",", "").isdigit()
                             else 0
                         )
-                        pct = float(parts[-1].strip().replace("%", "")) if "%" in parts[-1] else 5.0
+                        pct = (
+                            float(parts[-1].strip().replace("%", ""))
+                            if "%" in parts[-1]
+                            else 5.0
+                        )
 
                         hotspots.append(
                             Hotspot(
@@ -427,7 +540,9 @@ class JavaProfiler:
             for _ in range(duration * 2):
                 req_start = time.time()
                 try:
-                    response = httpx.get(f"http://localhost:{port}/catalog", timeout=5.0)
+                    response = httpx.get(
+                        f"http://localhost:{port}/catalog", timeout=5.0
+                    )
                     req_time = (time.time() - req_start) * 1000
                     if response.status_code == 200:
                         execution_times.append(req_time)
@@ -435,7 +550,9 @@ class JavaProfiler:
                     pass
                 time.sleep(0.5)
 
-            avg_time = sum(execution_times) / len(execution_times) if execution_times else 0.0
+            avg_time = (
+                sum(execution_times) / len(execution_times) if execution_times else 0.0
+            )
             hotspots = JavaProfiler._generate_hotspots(avg_time)
 
             return ProfileResult(
@@ -487,7 +604,9 @@ class CppProfiler:
     """Profiler for C++ code using austin frame sampler."""
 
     @staticmethod
-    def profile_with_austin(binary_path: str = None, duration: int = 5) -> ProfileResult:
+    def profile_with_austin(
+        binary_path: str = None, duration: int = 5
+    ) -> ProfileResult:
         """
         Profile C++ binary using austin frame sampler.
 
@@ -502,7 +621,12 @@ class CppProfiler:
         if not os.path.exists(binary_path):
             logger.warning(f"Binary not found: {binary_path}, compiling...")
             if not CppProfiler._compile_cpp():
-                return CppProfiler._fallback_profile(duration * 1000.0)
+                avg_time = measure_console_execution_time(
+                    [CPP_BINARY], warmup_runs=1, measure_runs=3
+                )
+                return CppProfiler._fallback_profile(
+                    avg_time if avg_time > 0 else duration * 1000.0
+                )
             binary_path = CPP_BINARY
 
         with tempfile.NamedTemporaryFile(suffix=".prof", delete=False) as f:
@@ -529,22 +653,42 @@ class CppProfiler:
                 )
             else:
                 error_msg = result.stderr.decode() if result.stderr else "austin failed"
-                logger.warning(f"austin failed: {error_msg}")
-                return CppProfiler._fallback_profile(duration * 1000.0)
+                logger.warning(
+                    f"austin failed: {error_msg}, measuring actual C++ execution time"
+                )
+                avg_time = measure_console_execution_time(
+                    [binary_path], warmup_runs=1, measure_runs=3
+                )
+                return CppProfiler._fallback_profile(
+                    avg_time if avg_time > 0 else duration * 1000.0
+                )
 
         except subprocess.TimeoutExpired:
+            avg_time = measure_console_execution_time(
+                [binary_path], warmup_runs=1, measure_runs=3
+            )
             return ProfileResult(
                 success=False,
-                execution_time_ms=duration * 1000.0,
+                execution_time_ms=avg_time if avg_time > 0 else duration * 1000.0,
                 hotspots=[],
                 error="Profile timed out",
             )
         except FileNotFoundError:
-            logger.warning("austin not found, using simulated profiling")
-            return CppProfiler._fallback_profile(duration * 1000.0)
+            logger.warning("austin not found, measuring actual C++ execution time")
+            avg_time = measure_console_execution_time(
+                [binary_path], warmup_runs=1, measure_runs=3
+            )
+            return CppProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
+            )
         except Exception as e:
-            logger.warning(f"austin error: {e}")
-            return CppProfiler._fallback_profile(duration * 1000.0)
+            logger.warning(f"austin error: {e}, measuring actual C++ execution time")
+            avg_time = measure_console_execution_time(
+                [binary_path], warmup_runs=1, measure_runs=3
+            )
+            return CppProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
+            )
         finally:
             if os.path.exists(output_file):
                 os.unlink(output_file)
@@ -587,7 +731,9 @@ class CppProfiler:
                 func_name = stack.split("->")[-1].strip() if "->" in stack else stack
                 if not func_name or func_name in ("__libc_start_main", "main"):
                     func_name = (
-                        stack.split(";")[-2].strip() if len(stack.split(";")) > 1 else func_name
+                        stack.split(";")[-2].strip()
+                        if len(stack.split(";")) > 1
+                        else func_name
                     )
 
                 hotspots.append(
@@ -631,7 +777,9 @@ class CppProfiler:
             for _ in range(duration * 2):
                 req_start = time.time()
                 try:
-                    response = httpx.get(f"http://localhost:{port}/catalog", timeout=5.0)
+                    response = httpx.get(
+                        f"http://localhost:{port}/catalog", timeout=5.0
+                    )
                     req_time = (time.time() - req_start) * 1000
                     if response.status_code == 200:
                         execution_times.append(req_time)
@@ -639,7 +787,9 @@ class CppProfiler:
                     pass
                 time.sleep(0.5)
 
-            avg_time = sum(execution_times) / len(execution_times) if execution_times else 0.0
+            avg_time = (
+                sum(execution_times) / len(execution_times) if execution_times else 0.0
+            )
             hotspots = CppProfiler._generate_hotspots(avg_time)
 
             return ProfileResult(
@@ -691,7 +841,9 @@ class ProfileRunner:
     """Unified profile runner for all languages."""
 
     @staticmethod
-    def profile(language: str, duration: int = 5, use_real_profiler: bool = True) -> ProfileResult:
+    def profile(
+        language: str, duration: int = 5, use_real_profiler: bool = True
+    ) -> ProfileResult:
         """
         Profile code for a specific language.
 

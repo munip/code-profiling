@@ -400,7 +400,7 @@ def _copy_baseline_templates(language: str):
                     logger.warning(f"[RESET] Java compilation failed: {result.stderr}")
 
             elif language == "cpp":
-                build_dir = base_dir / "server" / "cpp" / "build"
+                build_dir = Path("/app/server/cpp/build")
                 build_dir.mkdir(parents=True, exist_ok=True)
                 binary = build_dir / "ecommerce_api"
                 result = subprocess.run(
