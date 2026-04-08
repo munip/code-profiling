@@ -268,9 +268,60 @@ previous_memory_mb = 0.0
 @app.on_event("startup")
 async def startup_event():
     """Start all API servers on startup."""
-    # Verify profiler availability
     import shutil
+    import subprocess
+    import urllib.request
 
+    austin_path = shutil.which("austin")
+    async_profiler_path = Path("/tmp/async-profiler/profiler.sh")
+
+    # Download profilers if not found
+    if not async_profiler_path.exists():
+        logger.info("Downloading async-profiler...")
+        try:
+            arch = subprocess.run(
+                ["uname", "-m"], capture_output=True, text=True
+            ).stdout.strip()
+            if arch == "aarch64":
+                url = "https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz"
+            else:
+                url = "https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz"
+            Path("/tmp").mkdir(exist_ok=True)
+            urllib.request.urlretrieve(url, "/tmp/profiler.tar.gz")
+            subprocess.run(
+                ["tar", "-xzf", "/tmp/profiler.tar.gz", "-C", "/tmp"], check=True
+            )
+            subprocess.run(
+                ["mv", "/tmp/async-profiler-" + "*", "/tmp/async-profiler"],
+                shell=True,
+                check=True,
+            )
+            Path("/tmp/profiler.tar.gz").unlink(missing_ok=True)
+            logger.info("async-profiler downloaded")
+        except Exception as e:
+            logger.warning(f"Failed to download async-profiler: {e}")
+
+    if not austin_path:
+        logger.info("Downloading austin...")
+        try:
+            url = "https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz"
+            urllib.request.urlretrieve(url, "/tmp/austin.tar.xz")
+            subprocess.run(
+                ["tar", "-xf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
+            )
+            Path("/tmp/austin-4.0.0-gnu-linux-amd64/austin").rename(
+                "/usr/local/bin/austin"
+            )
+            Path("/usr/local/bin/austin").chmod(0o755)
+            import shutil as sh
+
+            sh.rmtree("/tmp/austin-4.0.0-gnu-linux-amd64", ignore_errors=True)
+            Path("/tmp/austin.tar.xz").unlink(missing_ok=True)
+            logger.info("austin downloaded")
+        except Exception as e:
+            logger.warning(f"Failed to download austin: {e}")
+
+    # Re-check after download attempt
     austin_path = shutil.which("austin")
     async_profiler_path = Path("/tmp/async-profiler/profiler.sh")
 
