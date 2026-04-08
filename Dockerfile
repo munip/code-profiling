@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=22
+ARG BUILD_VERSION=23
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -54,8 +54,8 @@ COPY README.md ./
 # Copy templates
 COPY environments/code_profiler_env/templates/ ./server/templates/
 
-# Install uv and generate lock file
-RUN pip install uv && uv lock --python python3.10
+# Install Python dependencies (uvicorn, fastapi, etc.)
+RUN pip install --no-cache-dir uvicorn fastapi pydantic httpx pyyaml psutil openenv-core
 
 # Create directories
 RUN mkdir -p /app/profiles /app/logs /app/server/python/src \
