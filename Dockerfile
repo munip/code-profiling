@@ -106,4 +106,4 @@ RUN git config --global user.email "profiler@hfspaces.app" && \
 
 EXPOSE 7860
 
-CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "-c", "import sys; sys.path.insert(0, '/app'); sys.path.insert(0, '/app/server'); from server.app import app, main; main()"]
