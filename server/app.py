@@ -359,24 +359,14 @@ def _copy_baseline_templates(language: str):
     import subprocess
     import os
 
-    base_dir = Path(__file__).parent.parent.parent
-    templates_dir = base_dir / "templates" / language
+    templates_dir = Path("/app/server/templates") / language
 
     if language == "python":
-        dest = base_dir / "server" / "python" / "src" / "app.py"
+        dest = Path("/app/server/python/src/app.py")
     elif language == "java":
-        dest = (
-            base_dir
-            / "server"
-            / "java"
-            / "src"
-            / "com"
-            / "ecommerce"
-            / "api"
-            / "ECommerceAPI.java"
-        )
+        dest = Path("/app/server/java/src/com/ecommerce/api/ECommerceAPI.java")
     elif language == "cpp":
-        dest = base_dir / "server" / "cpp" / "src" / "main.cpp"
+        dest = Path("/app/server/cpp/src/main.cpp")
     else:
         return
 
@@ -1081,6 +1071,11 @@ async def run_full_episode(request: RunEpisodeRequest):
 
     outcome_determiner = OutcomeDeterminer()
     code_fixer = CodeFixer()
+    code_fixer.set_source_path("python", Path("/app/server/python/src/app.py"))
+    code_fixer.set_source_path(
+        "java", Path("/app/server/java/src/com/ecommerce/api/ECommerceAPI.java")
+    )
+    code_fixer.set_source_path("cpp", Path("/app/server/cpp/src/main.cpp"))
     git_manager = GitManager()
     report_gen = ReportGenerator()
 
@@ -1117,15 +1112,18 @@ async def run_full_episode(request: RunEpisodeRequest):
 
         if outcome == "improve":
             code_fixer.apply_optimized(request.language)
+            ContainerManager.restart_api(request.language)
             message = f"iteration {iteration}: {outcome}"
             commit_sha = git_manager.commit(message)
         elif outcome == "degrade":
             code_fixer.apply_degraded(request.language)
+            ContainerManager.restart_api(request.language)
             message = f"iteration {iteration}: {outcome}"
             commit_sha = git_manager.commit(message)
         elif outcome == "remove":
             if last_improved_sha:
                 code_fixer.apply_optimized(request.language)
+                ContainerManager.restart_api(request.language)
             message = f"iteration {iteration}: {outcome}"
             commit_sha = git_manager.commit(message)
         else:

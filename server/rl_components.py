@@ -11,6 +11,7 @@ Reusable components for the multi-iteration RL loop including:
 import subprocess
 import random
 import time
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -46,7 +47,10 @@ class GitManager:
         """Commit current changes."""
         try:
             subprocess.run(
-                ["git", "add", "-A"], cwd=self.repo_path, check=True, capture_output=True
+                ["git", "add", "-A"],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
             )
             subprocess.run(
                 ["git", "commit", "-m", message],
@@ -55,14 +59,21 @@ class GitManager:
                 capture_output=True,
             )
             result = subprocess.run(
-                ["git", "rev-parse", "HEAD"], cwd=self.repo_path, capture_output=True, text=True
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip() if result.returncode == 0 else ""
         except Exception:
             return ""
 
     def commit_performance_fix(
-        self, iteration: int, result: str, issue_type: str = None, diff_summary: str = None
+        self,
+        iteration: int,
+        result: str,
+        issue_type: str = None,
+        diff_summary: str = None,
     ) -> str:
         """
         Commit with performance iteration message format.
@@ -88,7 +99,10 @@ class GitManager:
         """Check if the repository has uncommitted changes."""
         try:
             result = subprocess.run(
-                ["git", "status", "--porcelain"], cwd=self.repo_path, capture_output=True, text=True
+                ["git", "status", "--porcelain"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
             )
             return len(result.stdout.strip()) == 0
         except Exception:
@@ -101,7 +115,9 @@ class GitManager:
             if file_path:
                 cmd.append("--", file_path)
 
-            result = subprocess.run(cmd, cwd=self.repo_path, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, cwd=self.repo_path, capture_output=True, text=True
+            )
             return result.stdout.strip() if result.returncode == 0 else ""
         except Exception:
             return ""
@@ -122,7 +138,9 @@ class GitManager:
         """Checkout a file from a specific commit SHA."""
         try:
             result = subprocess.run(
-                ["git", "checkout", sha, "--", path], cwd=self.repo_path, capture_output=True
+                ["git", "checkout", sha, "--", path],
+                cwd=self.repo_path,
+                capture_output=True,
             )
             return result.returncode == 0
         except Exception:
@@ -145,7 +163,10 @@ class GitManager:
         """Get current commit SHA."""
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "HEAD"], cwd=self.repo_path, capture_output=True, text=True
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip() if result.returncode == 0 else ""
         except Exception:
@@ -296,7 +317,9 @@ class CodeFixer:
             if content:
                 self.original_baseline[language] = content
 
-    def find_function_range(self, code: str, func_signature: str, language: str = "java") -> tuple:
+    def find_function_range(
+        self, code: str, func_signature: str, language: str = "java"
+    ) -> tuple:
         """Find the start and end indices of a function."""
         start = code.find(func_signature)
         if start == -1:
@@ -412,9 +435,14 @@ class ContainerManager:
     def _is_docker_available(cls) -> bool:
         """Check if Docker and docker-compose are available."""
         try:
-            subprocess.run(["docker", "--version"], capture_output=True, timeout=5, check=True)
             subprocess.run(
-                ["docker-compose", "--version"], capture_output=True, timeout=5, check=True
+                ["docker", "--version"], capture_output=True, timeout=5, check=True
+            )
+            subprocess.run(
+                ["docker-compose", "--version"],
+                capture_output=True,
+                timeout=5,
+                check=True,
             )
             return True
         except Exception:
@@ -428,7 +456,9 @@ class ContainerManager:
             return False
 
         try:
-            subprocess.run(["docker", "stop", container], capture_output=True, timeout=30)
+            subprocess.run(
+                ["docker", "stop", container], capture_output=True, timeout=30
+            )
             subprocess.run(["docker", "rm", container], capture_output=True, timeout=30)
         except Exception:
             pass
@@ -477,6 +507,105 @@ class ContainerManager:
             f"Tag: {tag}"
         )
 
+    @classmethod
+    def restart_api(cls, language: str) -> bool:
+        """Restart the API after code changes. For HF Spaces runtime."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if language == "python":
+            return cls._restart_python()
+        elif language == "java":
+            return cls._compile_java()
+        elif language == "cpp":
+            return cls._compile_cpp()
+        return False
+
+    @classmethod
+    def _restart_python(cls) -> bool:
+        """Restart Python Flask API server."""
+        import logging
+        import sys
+        import os
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            sys.path.insert(0, "/app/server")
+            from start_apis import api_manager
+
+            api_manager.stop_python_api()
+            time.sleep(0.5)
+            if api_manager.start_python_api():
+                logger.info("[RESTART] Python API restarted successfully")
+                return True
+            else:
+                logger.error("[RESTART] Python API failed to start")
+                return False
+        except Exception as e:
+            logger.error(f"[RESTART] Error restarting Python API: {e}")
+            return False
+
+    @classmethod
+    def _compile_java(cls) -> bool:
+        """Recompile Java source after code changes."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            os.makedirs("/app/java_classes", exist_ok=True)
+            result = subprocess.run(
+                [
+                    "javac",
+                    "-d",
+                    "/app/java_classes",
+                    "-cp",
+                    "/app/server/java/src",
+                    "com/ecommerce/api/ECommerceAPI.java",
+                ],
+                cwd="/app/server/java/src",
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                logger.info("[COMPILE] Java recompiled successfully")
+                return True
+            else:
+                logger.error(f"[COMPILE] Java compilation failed: {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"[COMPILE] Java compilation error: {e}")
+            return False
+
+    @classmethod
+    def _compile_cpp(cls) -> bool:
+        """Recompile C++ source after code changes."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            src_path = Path("/app/server/cpp/src/main.cpp")
+            binary_path = Path("/app/server/cpp/build/ecommerce_api")
+            result = subprocess.run(
+                ["g++", "-O0", "-o", str(binary_path), str(src_path)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                logger.info("[COMPILE] C++ recompiled successfully")
+                return True
+            else:
+                logger.error(f"[COMPILE] C++ compilation failed: {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"[COMPILE] C++ compilation error: {e}")
+            return False
+
 
 class PerformanceRewardCalculator:
     """Calculates rewards based on graded percentage improvement/degradation."""
@@ -486,7 +615,9 @@ class PerformanceRewardCalculator:
         self.previous_ms = baseline_ms
         self.best_ms = baseline_ms
 
-    def compute_reward(self, current_ms: float, previous_ms: float = None) -> tuple[float, float]:
+    def compute_reward(
+        self, current_ms: float, previous_ms: float = None
+    ) -> tuple[float, float]:
         """Compute reward and delta percentage."""
         if previous_ms is not None:
             self.previous_ms = previous_ms
