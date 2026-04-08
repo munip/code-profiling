@@ -1327,12 +1327,15 @@ async def run_full_episode(request: RunEpisodeRequest):
 
         # Calculate step_reward based on outcome match
         # delta_percent < 0 means faster (good), > 0 means slower (bad)
+        # baseline outcome gets cumulative_score (now guaranteed >= 0.01)
         if outcome == "degrade":
-            step_reward = 0.0
+            step_reward = 0.01
+        elif outcome == "baseline":
+            step_reward = obs.cumulative_score
         elif delta_percent < 0:
             step_reward = obs.cumulative_score
         else:
-            step_reward = 0.0
+            step_reward = 0.01
 
         reward = obs.cumulative_score
         status = "IMPROVE" if delta_percent < 0 else "DEGRADE"
