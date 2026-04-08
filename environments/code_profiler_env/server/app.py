@@ -401,6 +401,16 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             ),
         ]
 
+        delta_percent = (
+            (
+                (execution_time_ms - state.baseline_performance_ms)
+                / state.baseline_performance_ms
+                * 100
+            )
+            if state.baseline_performance_ms > 0
+            else 0
+        )
+
         logger.info(f"[PROFILE] ============================================")
         logger.info(f"[PROFILE] Iteration {state.current_iteration} Profile Results")
         logger.info(f"[PROFILE] Language: {action.language}")
@@ -446,16 +456,6 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             hotspots=hotspots,
             iteration=state.current_iteration,
             max_iterations=state.current_task.max_iterations,
-        )
-
-        delta_percent = (
-            (
-                (execution_time_ms - state.baseline_performance_ms)
-                / state.baseline_performance_ms
-                * 100
-            )
-            if state.baseline_performance_ms > 0
-            else 0
         )
 
         reward = grader_result.score
