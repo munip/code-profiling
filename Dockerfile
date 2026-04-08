@@ -1,11 +1,11 @@
 # Code Profiler Environment - HuggingFace Spaces Dockerfile
 # ==========================================================
 # Supports: Python, Java, C++ profiling tasks
-# Profilers: austin (Python/C++), async-profiler (Java)
+# Note: Real profiling uses simulated fallback when tools unavailable
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=4
+ARG BUILD_VERSION=5
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -14,12 +14,8 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    git \
-    build-essential \
-    cmake \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,24 +26,16 @@ RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | te
     apt-get install -y --no-install-recommends temurin-17-jdk-headless && \
     rm -rf /var/lib/apt/lists/*
 
-# Build and install austin (frame sampler for Python/C++)
-RUN git clone --depth 1 https://github.com/nickparajon/austin.git /tmp/austin && \
-    cd /tmp/austin && \
-    make && \
-    make install && \
-    cd / && \
-    rm -rf /tmp/austin
+# Install Python dependencies (includes py-spy for profiling)
+RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx py-spy openai pyyaml psutil flask
 
-# Install async-profiler for Java
-ENV ASYNC_PROFILER_HOME=/opt/async-profiler
+# Download async-profiler for Java (pre-downloaded binary)
 RUN mkdir -p /opt/async-profiler && \
     curl -sL https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz | \
     tar -xz -C /opt/async-profiler --strip-components=1 && \
     chmod +x /opt/async-profiler/profiler.sh
+ENV ASYNC_PROFILER_HOME=/opt/async-profiler
 ENV PATH=$PATH:/opt/async-profiler
-
-# Install Python dependencies
-RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx austin-python py-spy openai pyyaml psutil
 
 COPY environments/ ./environments/
 COPY inference.py ./
