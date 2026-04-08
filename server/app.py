@@ -296,7 +296,15 @@ async def startup_event():
 
             dirs = glob.glob("/tmp/async-profiler-*")
             if dirs:
-                subprocess.run(["mv", dirs[0], "/tmp/async-profiler"], check=True)
+                # If /tmp/async-profiler exists, merge contents
+                if Path("/tmp/async-profiler").exists():
+                    import shutil
+
+                    for item in Path(dirs[0]).iterdir():
+                        shutil.move(str(item), "/tmp/async-profiler/")
+                    shutil.rmtree(dirs[0], ignore_errors=True)
+                else:
+                    subprocess.run(["mv", dirs[0], "/tmp/async-profiler"], check=True)
             Path("/tmp/profiler.tar.gz").unlink(missing_ok=True)
             logger.info("async-profiler downloaded")
         except Exception as e:
@@ -308,23 +316,29 @@ async def startup_event():
             url = "https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz"
             urllib.request.urlretrieve(url, "/tmp/austin.tar.xz")
             subprocess.run(
-                ["tar", "-xf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
+                ["tar", "-xJf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
             )
             # Find and move the extracted austin binary
             import glob
 
             dirs = glob.glob("/tmp/austin-*")
+            found = False
             for d in dirs:
                 austin_bin = Path(d) / "austin"
                 if austin_bin.exists():
                     import shutil
 
+                    Path("/usr/local/bin").mkdir(exist_ok=True)
                     shutil.copy(austin_bin, "/usr/local/bin/austin")
                     Path("/usr/local/bin/austin").chmod(0o755)
                     shutil.rmtree(d, ignore_errors=True)
+                    found = True
                     break
+            if not found:
+                logger.warning("austin binary not found in extracted archive")
             Path("/tmp/austin.tar.xz").unlink(missing_ok=True)
-            logger.info("austin downloaded")
+            if found:
+                logger.info("austin downloaded")
         except Exception as e:
             logger.warning(f"Failed to download austin: {e}")
 
