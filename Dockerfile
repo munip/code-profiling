@@ -19,17 +19,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first for better caching
 COPY pyproject.toml ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e .
 
 # Copy application code
 COPY environments/ ./environments/
 COPY inference.py ./
 COPY README.md ./
 
+
 # Copy server application
 COPY environments/code_profiler_env/server/app.py ./environments/code_profiler_env/server/app.py
 COPY environments/code_profiler_env/models.py ./environments/code_profiler_env/models.py
+
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
 
 # Create profiles directory
 RUN mkdir -p /app/profiles /app/logs
