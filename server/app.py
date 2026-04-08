@@ -389,11 +389,19 @@ def _copy_baseline_templates(language: str):
 
             if language == "java":
                 os.makedirs("/app/java_classes", exist_ok=True)
+                java_src_dir = "/app/server/java/src"
                 result = subprocess.run(
-                    ["javac", "-d", "/app/java_classes", str(dest)],
+                    [
+                        "javac",
+                        "-d",
+                        "/app/java_classes",
+                        "-cp",
+                        "/app/server/java/src",
+                        "com/ecommerce/api/ECommerceAPI.java",
+                    ],
                     capture_output=True,
                     text=True,
-                    cwd=str(dest.parent),
+                    cwd=java_src_dir,
                     timeout=60,
                 )
                 if result.returncode == 0:
