@@ -42,25 +42,77 @@ class GitManager:
 
     def __init__(self, repo_path: Path = None):
         import logging
+
         self._logger = logging.getLogger(__name__)
         self.repo_path = repo_path or Path("/app")
         self._ensure_git_repo()
         self._logger.info(f"[GIT] Initialized with repo_path={self.repo_path}")
-    
+
     def _ensure_git_repo(self):
-        """Ensure the directory is a git repository."""
-        git_dir = self.repo_path / ".git"
-        if not git_dir.exists():
-            self._logger.info("[GIT] No .git directory found, initializing...")
-            try:
-                subprocess.run(["git", "init"], cwd=self.repo_path, check=True, capture_output=True)
-                subprocess.run(["git", "config", "user.email", "profiler@hfspaces.app"], cwd=self.repo_path, check=True, capture_output=True)
-                subprocess.run(["git", "config", "user.name", "Code Profiler"], cwd=self.repo_path, check=True, capture_output=True)
-                subprocess.run(["git", "add", "-A"], cwd=self.repo_path, check=True, capture_output=True)
-                subprocess.run(["git", "commit", "-m", "baseline: initial code"], cwd=self.repo_path, check=True, capture_output=True)
-                self._logger.info("[GIT] Git repo initialized with baseline commit")
-            except Exception as e:
-                self._logger.error(f"[GIT] Failed to init git repo: {e}")
+        """Ensure the directory is a git repository with at least one commit."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                self._logger.info(f"[GIT] Git repo exists at: {result.stdout.strip()}")
+
+                result2 = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result2.returncode != 0:
+                    self._logger.warning(
+                        "[GIT] Git repo exists but no commits, adding baseline commit..."
+                    )
+                    self._add_baseline_commit()
+                return
+            else:
+                self._logger.info("[GIT] Not a git repo, initializing...")
+                subprocess.run(
+                    ["git", "init"], cwd=self.repo_path, check=True, capture_output=True
+                )
+                subprocess.run(
+                    ["git", "config", "user.email", "profiler@hfspaces.app"],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "config", "user.name", "Code Profiler"],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+                self._add_baseline_commit()
+        except Exception as e:
+            self._logger.error(f"[GIT] Failed to ensure git repo: {e}")
+
+    def _add_baseline_commit(self):
+        """Add a baseline commit with all current files."""
+        try:
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "baseline: initial code"],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+            self._logger.info("[GIT] Baseline commit created")
+        except Exception as e:
+            self._logger.warning(f"[GIT] Baseline commit may have failed: {e}")
 
     def commit(self, message: str) -> str:
         """Commit current changes."""
@@ -461,6 +513,10 @@ class CodeFixer:
             f"[CODEFIX] New file will have {len(new_file_code)} bytes (was {len(code)})"
         )
 
+        if new_file_code == code:
+            logger.info("[CODEFIX] No changes needed - code is identical")
+            return True
+
         if path:
             path.write_text(new_file_code)
             logger.info(f"[CODEFIX] Successfully wrote optimized code to {path}")
@@ -776,5 +832,3 @@ class OutcomeDeterminer:
             return random.choice(["improve", "degrade", "remove"])
         else:
             return random.choice(["improve", "degrade", "remove"])
-
-
