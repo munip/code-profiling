@@ -443,10 +443,6 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
                 logger.info(f"[PROFILE]    Fix: {fix_suggestions[h.function_name]}")
             logger.info(f"[PROFILE] ------------------------------------------------")
 
-        logger.info(f"[PROFILE] Score: {grader_result.score:.2f}")
-        logger.info(f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}")
-        logger.info(f"[PROFILE] ============================================")
-
         grader_result = PerformanceGrader.grade_task(
             task=state.current_task,
             baseline_ms=state.baseline_performance_ms,
@@ -457,6 +453,10 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             iteration=state.current_iteration,
             max_iterations=state.current_task.max_iterations,
         )
+
+        logger.info(f"[PROFILE] Score: {grader_result.score:.2f}")
+        logger.info(f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}")
+        logger.info(f"[PROFILE] ============================================")
 
         reward = grader_result.score
         cumulative_score = grader_result.score
