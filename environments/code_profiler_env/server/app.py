@@ -748,7 +748,7 @@ async def root():
 
     return JSONResponse(
         content={
-            "message": "Code Profiler Environment API",
+            "message": "OpenEnv Environment API for driving iterative code profiling and performance optimization of LLM generated code. Use /reset to start a new episode and /step to interact with the environment.",
             "status": "running",
             "version": "1.0.0-hackathon",
             "tasks": [t.task_id for t in AVAILABLE_TASKS],

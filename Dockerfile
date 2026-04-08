@@ -1,5 +1,6 @@
 # Code Profiler Environment - HuggingFace Spaces Dockerfile
 # ==========================================================
+# Supports: Python, Java, C++ profiling tasks
 
 FROM python:3.10-slim
 
