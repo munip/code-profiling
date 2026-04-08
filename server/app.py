@@ -1208,9 +1208,24 @@ async def run_full_episode(request: RunEpisodeRequest):
 
         obs = step_result.observation
         delta_percent = obs.delta_percent
-        step_reward = obs.step_reward
+
+        # Calculate step_reward based on outcome match
+        # delta_percent < 0 means faster (good), > 0 means slower (bad)
+        if outcome == "improve":
+            if delta_percent < 0:
+                step_reward = obs.cumulative_score
+            else:
+                step_reward = 0.0
+        elif outcome == "degrade":
+            if delta_percent > 0:
+                step_reward = 0.0
+            else:
+                step_reward = 0.0
+        else:  # remove or unchanged
+            step_reward = 0.0
+
         reward = obs.cumulative_score
-        status = "IMPROVE" if step_reward > 0 else "DEGRADE"
+        status = "IMPROVE" if delta_percent < 0 else "DEGRADE"
 
         if step_reward > 0 and not net_positive_achieved:
             net_positive_achieved = True
