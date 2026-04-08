@@ -1,0 +1,36 @@
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.venv
+env/
+venv/
+openenv-hackathon/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and profiles
+logs/
+profiles/
+*.prof
+*.mojo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local testing
+*.log
+.ruff_cache/
