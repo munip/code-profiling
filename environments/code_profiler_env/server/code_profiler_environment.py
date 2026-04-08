@@ -326,29 +326,31 @@ class CodeProfilerEnvironment(Environment):
                     timeout=30,
                 )
             elif language == "java":
+                import shutil
+
+                os.makedirs("/app/java_classes", exist_ok=True)
                 result = subprocess.run(
-                    ["javac"] + list(code_path.glob("**/*.java")),
+                    ["javac", "-d", "/app/java_classes"] + list(code_path.glob("**/*.java")),
                     capture_output=True,
                     text=True,
                     cwd=code_path,
                     timeout=60,
                 )
             elif language == "cpp":
-                build_dir = code_path.parent / "build"
-                build_dir.mkdir(exist_ok=True)
+                build_dir = Path("/app/cpp_src/build")
+                build_dir.mkdir(parents=True, exist_ok=True)
                 result = subprocess.run(
-                    ["cmake", "-B", str(build_dir), str(code_path.parent)],
+                    [
+                        "g++",
+                        "-O0",
+                        "-o",
+                        str(build_dir / "ecommerce_api"),
+                        str(code_path / "main.cpp"),
+                    ],
                     capture_output=True,
                     text=True,
                     timeout=60,
                 )
-                if result.returncode == 0:
-                    result = subprocess.run(
-                        ["cmake", "--build", str(build_dir)],
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                    )
 
             return result.returncode == 0, result.stdout + result.stderr
 
@@ -392,7 +394,7 @@ class CodeProfilerEnvironment(Environment):
                         hotspots = self._convert_to_hotspots(parsed)
 
             elif language == "cpp":
-                binary_path = code_path.parent / "build" / "ecommerce_api"
+                binary_path = Path("/app/cpp_src/build/ecommerce_api")
                 if binary_path.exists():
                     result = profiler.profile(str(binary_path), duration_seconds=5)
                     if result.success:

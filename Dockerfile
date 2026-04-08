@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=2
+ARG BUILD_VERSION=12
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -30,12 +30,14 @@ RUN mkdir -p /tmp/async-profiler && \
     mv /tmp/async-profiler-* /tmp/async-profiler
 ENV ASYNC_PROFILER_HOME=/tmp/async-profiler
 
-# Download austin to /tmp (may fail on HF Spaces - will use simulated)
+# Download austin and add to PATH
 RUN set +e; \
     wget --timeout=120 --tries=2 https://github.com/nickparajon/austin/releases/download/2.1.2/austin-2.1.2-x64.gz -O /tmp/austin.gz; \
     gunzip -f /tmp/austin.gz; \
     chmod +x /tmp/austin; \
+    mv /tmp/austin /usr/local/bin/austin; \
     set -e
+ENV PATH="/usr/local/bin:${PATH}"
 
 # Install Python dependencies
 RUN pip install --no-cache-dir fastapi uvicorn pydantic httpx py-spy openai pyyaml psutil flask
@@ -45,7 +47,7 @@ COPY inference.py ./
 COPY README.md ./
 COPY pyproject.toml ./
 
-RUN mkdir -p /app/profiles /app/logs
+RUN mkdir -p /app/profiles /app/logs /app/server/python/src /app/server/java/src/com/ecommerce/api /app/cpp_src/build /app/java_classes
 
 EXPOSE 7860
 

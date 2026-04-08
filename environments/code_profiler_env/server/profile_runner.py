@@ -24,7 +24,7 @@ JAVA_SRC_PATH = "/app/server/java/src"
 JAVA_CLASSPATH = "/app/java_classes"
 CPP_SRC_PATH = "/app/server/cpp/src"
 CPP_BINARY = "/app/cpp_src/build/ecommerce_api"
-ASYNC_PROFILER_HOME = "/opt/async-profiler"
+ASYNC_PROFILER_HOME = "/tmp/async-profiler"
 PYTHON_SRC_PATH = "/app/server/python/src"
 
 PYTHON_API_PORT = 5000
