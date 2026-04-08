@@ -373,7 +373,8 @@ async def startup_event():
 
     # Re-check after download attempt
     austin_path = shutil.which("austin")
-    async_profiler_path = Path("/tmp/async-profiler/profiler.sh")
+    # async-profiler has bin/asprof, check for bin directory
+    async_profiler_path = Path("/tmp/async-profiler/bin/asprof")
 
     logger.info("=== Profiler Availability ===")
     logger.info(

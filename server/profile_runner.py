@@ -390,7 +390,7 @@ class JavaProfiler:
         try:
             result = subprocess.run(
                 [
-                    f"{ASYNC_PROFILER_HOME}/profiler.sh",
+                    f"{ASYNC_PROFILER_HOME}/bin/asprof",
                     "-d",
                     str(duration),
                     "-f",
