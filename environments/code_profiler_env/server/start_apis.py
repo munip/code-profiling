@@ -17,7 +17,10 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 JAVA_MAIN_CLASS = "com.ecommerce.api.ECommerceAPI"
-CPP_BINARY = "/app/cpp_src/build/ecommerce_api"
+JAVA_SRC_PATH = "/app/server/java/src"
+CPP_SRC_PATH = "/app/server/cpp/src"
+CPP_BINARY = "/app/server/cpp/build/ecommerce_api"
+PYTHON_APP_PATH = "/app/server/python/src/app.py"
 PYTHON_API_PORT = 5000
 JAVA_API_PORT = 5001
 CPP_API_PORT = 5002
@@ -51,9 +54,14 @@ class APIServerManager:
             env = os.environ.copy()
             env["FLASK_ENV"] = "production"
             env["PYTHONUNBUFFERED"] = "1"
+            env["FLASK_APP"] = PYTHON_APP_PATH
 
             self.python_server.process = subprocess.Popen(
-                ["python", "/app/python_api.py"],
+                [
+                    "python",
+                    "-c",
+                    f"from flask import Flask, jsonify; app = Flask(__name__); exec(open('{PYTHON_APP_PATH}').read()); app.run(host='0.0.0.0', port={PYTHON_API_PORT})",
+                ],
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -79,7 +87,7 @@ class APIServerManager:
                 return True
 
             self.java_server.process = subprocess.Popen(
-                ["java", "-cp", "/app/java_classes", JAVA_MAIN_CLASS],
+                ["java", "-cp", "/app/server/java/src:/app/java_classes", JAVA_MAIN_CLASS],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid if os.name != "nt" else None,

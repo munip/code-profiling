@@ -21,11 +21,12 @@ logger = logging.getLogger(__name__)
 
 JAVA_MAIN_CLASS = "com.ecommerce.api.ECommerceAPI"
 JAVA_SRC_PATH = "/app/server/java/src"
-JAVA_CLASSPATH = "/app/java_classes"
+JAVA_CLASSPATH = "/app/server/java/src:/app/java_classes"
 CPP_SRC_PATH = "/app/server/cpp/src"
-CPP_BINARY = "/app/cpp_src/build/ecommerce_api"
+CPP_BINARY = "/app/server/cpp/build/ecommerce_api"
 ASYNC_PROFILER_HOME = "/tmp/async-profiler"
 PYTHON_SRC_PATH = "/app/server/python/src"
+PYTHON_APP_PATH = "/app/server/python/src/app.py"
 
 PYTHON_API_PORT = 5000
 JAVA_API_PORT = 5001

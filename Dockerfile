@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=12
+ARG BUILD_VERSION=2
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -47,7 +47,7 @@ COPY inference.py ./
 COPY README.md ./
 COPY pyproject.toml ./
 
-RUN mkdir -p /app/profiles /app/logs /app/server/python/src /app/server/java/src/com/ecommerce/api /app/cpp_src/build /app/java_classes
+RUN mkdir -p /app/profiles /app/logs /app/server/python/src /app/server/java/src/com/ecommerce/api /app/server/cpp/build /app/java_classes
 
 EXPOSE 7860
 

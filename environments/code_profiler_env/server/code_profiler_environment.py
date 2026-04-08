@@ -337,7 +337,7 @@ class CodeProfilerEnvironment(Environment):
                     timeout=60,
                 )
             elif language == "cpp":
-                build_dir = Path("/app/cpp_src/build")
+                build_dir = Path("/app/server/cpp/build")
                 build_dir.mkdir(parents=True, exist_ok=True)
                 result = subprocess.run(
                     [
@@ -394,7 +394,7 @@ class CodeProfilerEnvironment(Environment):
                         hotspots = self._convert_to_hotspots(parsed)
 
             elif language == "cpp":
-                binary_path = Path("/app/cpp_src/build/ecommerce_api")
+                binary_path = Path("/app/server/cpp/build/ecommerce_api")
                 if binary_path.exists():
                     result = profiler.profile(str(binary_path), duration_seconds=5)
                     if result.success:
