@@ -5,7 +5,7 @@
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=3
+ARG BUILD_VERSION=4
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -14,14 +14,21 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 
 WORKDIR /app
 
-# Install system dependencies including austin
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     build-essential \
     cmake \
-    openjdk-17-jdk-headless \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Eclipse Temurin JDK 17 from Adoptium
+RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/trusted.gpg.d/adoptium.asc && \
+    echo "deb https://packages.adoptium.net/artifactory/debian bullseye main" | tee /etc/apt/sources.list.d/adoptium.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends temurin-17-jdk-headless && \
+    rm -rf /var/lib/apt/lists/*
 
 # Build and install austin (frame sampler for Python/C++)
 RUN git clone --depth 1 https://github.com/nickparajon/austin.git /tmp/austin && \
