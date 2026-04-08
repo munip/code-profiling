@@ -8,20 +8,13 @@ import random
 import threading
 from pathlib import Path
 
-app_dir = (
-    Path(__file__).parent.resolve() if "__file__" in dir() else Path.cwd() / "server"
-)
+app_dir = Path(__file__).parent.resolve() if "__file__" else Path(__file__).parent
 project_root = app_dir.parent
 
-if os.name != "nt" and os.path.exists("/app"):
-    os.chdir("/app")
+if "/app" not in sys.path:
     sys.path.insert(0, "/app")
-    sys.path.insert(0, "/app/server")
-else:
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-    if str(app_dir) not in sys.path:
-        sys.path.insert(0, str(app_dir))
+if str(app_dir) not in sys.path:
+    sys.path.insert(0, str(app_dir))
 
 import uuid
 from datetime import datetime
@@ -55,7 +48,6 @@ from models import (
     TaskType,
 )
 
-
 from rl_components import (
     IterationResult as RLIterationResult,
     GitManager,
@@ -66,8 +58,8 @@ from rl_components import (
 from report_generator import ReportGenerator, create_episode_report, IterationRecord
 
 try:
-    from server.start_apis import api_manager, start_apis_on_boot
-    from server.profile_runner import ProfileRunner
+    from start_apis import api_manager, start_apis_on_boot
+    from profile_runner import ProfileRunner
 
     APIS_AVAILABLE = True
 except ImportError as e:
