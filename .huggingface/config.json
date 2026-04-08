@@ -13,7 +13,6 @@
     "reinforcement-learning",
     "rl-environment"
   ],
-  "模型的": "code-profiling",
   "short_description": "OpenEnv environment for iterative code profiling and performance optimization using RL agents.",
   "type": "docker"
 }

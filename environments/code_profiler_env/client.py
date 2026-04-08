@@ -57,6 +57,7 @@ class CodeProfilerEnv(EnvClient):
 
     async def step(self, action: ProfileAction) -> StepResult:
         """Take a step in the environment."""
+        print(f"Taking step with action from the client: {action}")  # Debug statement to show action being taken
         response = await self._post("/step", json=action.model_dump())
         data = response.json()
         return StepResult(**data)
@@ -81,10 +82,15 @@ class CodeProfilerEnv(EnvClient):
 
     async def get_hotspots(self) -> list:
         """Get current hotspots from the last profile run."""
+        print("Getting current hotspots from the last profile run")  # Debug statement to confirm hotspots retrieval
         response = await self._get("/hotspots")
+        print(f"Received hotspots response: {response.json()}")  # Debug statement to show hotspots response
+
         return response.json()
 
     async def get_iteration_results(self) -> list:
         """Get all iteration results."""
+        print("Getting all iteration results")  # Debug statement to confirm results retrieval
         response = await self._get("/results")
+        print(f"Received iteration results response: {response.json()}")  # Debug statement to show results response
         return response.json()

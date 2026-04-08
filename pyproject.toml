@@ -19,8 +19,9 @@ dependencies = [
     "pydantic>=2.0.0",
     "httpx>=0.25.0",
     "docker>=6.1.0",
-    "austin-python>=4.0.0",
+    "austin-python>=2.1.2,<3.0.0",
     "py-spy>=0.3.14",
+    "openai>=0.4",
 ]
 
 [project.optional-dependencies]

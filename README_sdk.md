@@ -19,7 +19,7 @@ model_index:
 
 # Code Profiler Environment
 
-An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks in Python, Java, and C++ code.
+An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks based on pcode profiler runs. To start with support is available for Python, Java, and C++ code.
 
 ## Overview
 
