@@ -114,29 +114,47 @@ class GitManager:
         except Exception as e:
             self._logger.warning(f"[GIT] Baseline commit may have failed: {e}")
 
-    def commit(self, message: str) -> str:
-        """Commit current changes."""
+    def commit(self, message: str, allow_empty: bool = True) -> str:
+        """Commit with iteration message. Always commits to track iteration history."""
         try:
+            if not allow_empty:
+                status_result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                )
+                if not status_result.stdout.strip():
+                    self._logger.info("[GIT] No changes to commit")
+                    return ""
+
             subprocess.run(
                 ["git", "add", "-A"],
                 cwd=self.repo_path,
                 check=True,
                 capture_output=True,
             )
-            subprocess.run(
-                ["git", "commit", "-m", message],
-                cwd=self.repo_path,
-                check=True,
-                capture_output=True,
-            )
             result = subprocess.run(
+                ["git", "commit", "-m", message, "--allow-empty"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                self._logger.error(f"[GIT] Commit failed: {result.stderr}")
+                return ""
+
+            sha_result = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
             )
-            return result.stdout.strip() if result.returncode == 0 else ""
-        except Exception:
+            sha = sha_result.stdout.strip() if sha_result.returncode == 0 else ""
+            self._logger.info(f"[GIT] Committed: {sha}")
+            return sha
+        except Exception as e:
+            self._logger.error(f"[GIT] Commit error: {type(e).__name__}: {e}")
             return ""
 
     def commit_performance_fix(
