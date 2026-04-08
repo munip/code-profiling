@@ -345,6 +345,11 @@ class ContainerManager:
             return False
 
         try:
+            subprocess.run(["docker", "info"], capture_output=True, timeout=5)
+        except Exception:
+            return False
+
+        try:
             subprocess.run(["docker", "stop", container], capture_output=True, timeout=30)
             subprocess.run(["docker", "rm", container], capture_output=True, timeout=30)
         except Exception:
