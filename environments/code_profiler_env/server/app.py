@@ -327,8 +327,10 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
 
 
 def _copy_baseline_templates(language: str):
-    """Copy baseline templates to working directory."""
+    """Copy baseline templates to working directory and compile if needed."""
     import shutil
+    import subprocess
+    import os
 
     base_dir = Path(__file__).parent.parent.parent
     templates_dir = base_dir / "templates" / language
@@ -350,6 +352,36 @@ def _copy_baseline_templates(language: str):
         try:
             shutil.copy2(src, dest)
             logger.info(f"[RESET] Copied baseline template from {src} to {dest}")
+
+            if language == "java":
+                os.makedirs("/app/java_classes", exist_ok=True)
+                result = subprocess.run(
+                    ["javac", "-d", "/app/java_classes", str(dest)],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(dest.parent),
+                    timeout=60,
+                )
+                if result.returncode == 0:
+                    logger.info("[RESET] Java compiled successfully")
+                else:
+                    logger.warning(f"[RESET] Java compilation failed: {result.stderr}")
+
+            elif language == "cpp":
+                build_dir = base_dir / "server" / "cpp" / "build"
+                build_dir.mkdir(parents=True, exist_ok=True)
+                binary = build_dir / "ecommerce_api"
+                result = subprocess.run(
+                    ["g++", "-O0", "-o", str(binary), str(dest)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if result.returncode == 0:
+                    logger.info("[RESET] C++ compiled successfully")
+                else:
+                    logger.warning(f"[RESET] C++ compilation failed: {result.stderr}")
+
         except Exception as e:
             logger.warning(f"[RESET] Failed to copy baseline template: {e}")
 
