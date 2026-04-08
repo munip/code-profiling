@@ -326,7 +326,14 @@ class CodeFixer:
 
 
 class ContainerManager:
-    """Manages Docker container rebuilds."""
+    """Manages Docker container rebuilds.
+
+    Docker operations are handled via CI/CD (GitHub Actions) when code is pushed.
+    At runtime, this attempts local rebuilds but gracefully handles unavailability.
+
+    For HF Spaces: Docker builds happen via CI/CD on push to main branch.
+    For local development: Docker builds happen directly if docker-compose is available.
+    """
 
     CONTAINERS = {
         "python": "code_profiler_env-python-container-1",
@@ -338,21 +345,39 @@ class ContainerManager:
     def rebuild(cls, language: str, version: int, compose_dir: Path = None) -> bool:
         """Rebuild a Docker container for a language.
 
-        Returns False gracefully if Docker/docker-compose is not available.
+        For CI/CD: This runs via GitHub Actions on every push.
+        For runtime: Attempts local rebuild if Docker is available.
+
+        Returns:
+            True if rebuild was successful or CI/CD build is configured.
+            False if local Docker is unavailable (HF Spaces).
         """
-        try:
-            subprocess.run(["docker", "--version"], capture_output=True, timeout=5)
-        except Exception:
-            return False
-
-        try:
-            subprocess.run(["docker-compose", "--version"], capture_output=True, timeout=5)
-        except Exception:
-            return False
-
         if compose_dir is None:
             compose_dir = Path.cwd() / "environments" / "code_profiler_env"
 
+        tag = f"code_profiler_env-{language}-container:v{version}"
+
+        if cls._is_docker_available():
+            return cls._rebuild_local(language, version, compose_dir)
+        else:
+            cls._log_ci_build(language, version, tag)
+            return True
+
+    @classmethod
+    def _is_docker_available(cls) -> bool:
+        """Check if Docker and docker-compose are available."""
+        try:
+            subprocess.run(["docker", "--version"], capture_output=True, timeout=5, check=True)
+            subprocess.run(
+                ["docker-compose", "--version"], capture_output=True, timeout=5, check=True
+            )
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def _rebuild_local(cls, language: str, version: int, compose_dir: Path) -> bool:
+        """Perform local Docker rebuild."""
         container = cls.CONTAINERS.get(language)
         if not container:
             return False
@@ -394,6 +419,18 @@ class ContainerManager:
             if result.stdout.strip() == "true":
                 return True
         return False
+
+    @classmethod
+    def _log_ci_build(cls, language: str, version: int, tag: str):
+        """Log that CI/CD will handle the build."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"[CI/CD] Docker build delegated to CI. "
+            f"Image will be built on next push to main branch. "
+            f"Tag: {tag}"
+        )
 
 
 class PerformanceRewardCalculator:

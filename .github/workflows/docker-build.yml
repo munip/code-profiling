@@ -1,0 +1,108 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      docker:
+        image: docker:20.10.16
+        options: --privileged
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Compose services
+        run: |
+          cd environments/code_profiler_env
+          docker-compose build
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+      - name: Push Docker images
+        if: github.event_name == 'push'
+        env:
+          IMAGE_TAG: ${{ secrets.DOCKER_USERNAME }}/code-profiler-${{ matrix.service }}:${{ github.sha }}
+        run: |
+          cd environments/code_profiler_env
+          docker-compose push
+
+  build-python:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Python container
+        run: |
+          cd environments/code_profiler_env/server/python
+          docker build -t code-profiler-python:latest .
+
+      - name: Build OpenEnv container
+        run: |
+          cd environments/code_profiler_env/server
+          docker build -t code-profiler-openenv:latest .
+
+      - name: Build Java container
+        run: |
+          cd environments/code_profiler_env/server/java
+          docker build -t code-profiler-java:latest .
+
+      - name: Build C++ container
+        run: |
+          cd environments/code_profiler_env/server/cpp
+          docker build -t code-profiler-cpp:latest .
+
+      - name: Build Full Stack
+        run: |
+          cd environments/code_profiler_env
+          docker-compose build
+          echo "Docker build successful!"
+
+  validate:
+    needs: build-python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          cd environments/code_profiler_env
+          python3 -m py_compile server/app.py
+          python3 -m py_compile models.py
+          python3 -m py_compile rl_components.py
+          python3 -m py_compile report_generator.py
+          echo "Python validation complete!"
+
+      - name: Validate OpenEnv spec
+        run: |
+          cd environments/code_profiler_env
+          python3 -c "
+            import yaml
+            with open('openenv.yaml') as f:
+                config = yaml.safe_load(f)
+            assert 'tasks' in config
+            assert len(config['tasks']) >= 3
+            print(f'Validated {len(config[\"tasks\"])} tasks')
+          "
