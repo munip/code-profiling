@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 openenv-server = "code_profiler_env.server.app:main"
+server = "code_profiler_env.server.app:main"
 
 [tool.setuptools]
 include-package-data = true

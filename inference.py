@@ -15,6 +15,12 @@ EXECUTION MODES
     --mode hybrid  : Local loop with HF for LLM calls (default for development)
     --mode full    : Full RL loop runs in HF Space (default for submission)
 
+TIMING OUTPUT
+    Each run captures timing information for performance analysis:
+    - Total execution time
+    - Per-task execution time
+    - Step timing
+
 STDOUT FORMAT
 - The script must emit exactly three line types to stdout, in this order:
 
@@ -44,6 +50,7 @@ import argparse
 import asyncio
 import os
 import sys
+from datetime import datetime
 from typing import List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "environments", "code_profiler_env"))
@@ -60,7 +67,7 @@ DEFAULT_MODE = "full"
 
 
 class CodeProfilerClient:
-    """Simple HTTP client for the Code Profiler Environment."""
+    """Simple HTTP Openenv client for the Code Profiler Environment."""
 
     def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url.rstrip("/")
@@ -85,6 +92,10 @@ class CodeProfilerClient:
         return await self._request("POST", "/step", action)
 
     async def run_full_episode(self, task_id: str, language: str, max_iterations: int = 5):
+        """
+        For full episode mode, we send the task_id and language and let the server run the entire episode inside the HF Space environment or local. This is a single call that returns the full episode results.
+        In the submission HF Space for stage 1, all code is in same container, so this endpoint can be implemented to run the episode loop locally without making external calls, just for simplicity and to avoid issues with async calls from HF Space to local server.
+        """
         data = {
             "task_id": task_id,
             "language": language,
@@ -390,6 +401,8 @@ async def run_task_hybrid(
 
 async def main():
     """Main inference loop."""
+    import time
+
     parser = argparse.ArgumentParser(description="Code Profiler Inference")
     parser.add_argument(
         "--mode",
@@ -407,14 +420,20 @@ async def main():
     openai_client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
     client = CodeProfilerClient(base_url=ENV_BASE_URL)
 
+    total_start_time = time.time()
+
     print(f"Running inference with model: {MODEL_NAME}")
     print(f"API Base URL: {API_BASE_URL}")
     print(f"Environment: {ENV_BASE_URL}")
     print(f"Execution Mode: {args.mode}")
+    print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
 
     results = []
+    task_timings = []
+
     for task in AVAILABLE_TASKS:
+        task_start_time = time.time()
         print(f"\n{'=' * 60}")
         print(f"Running task: {task.name} ({task.difficulty.value})")
         print(f"{'=' * 60}")
@@ -424,8 +443,22 @@ async def main():
         else:
             result = await run_task_hybrid(client, openai_client, task, MODEL_NAME)
 
+        task_end_time = time.time()
+        task_duration = task_end_time - task_start_time
+        task_timings.append(
+            {
+                "task_id": task.task_id,
+                "duration_seconds": task_duration,
+                "steps": result.get("steps", 0),
+            }
+        )
+
+        result["duration_seconds"] = task_duration
         results.append(result)
         await asyncio.sleep(1)
+
+    total_end_time = time.time()
+    total_duration = total_end_time - total_start_time
 
     print("\n" + "=" * 60)
     print("FINAL RESULTS")
@@ -434,13 +467,24 @@ async def main():
     total_score = 0.0
     for result in results:
         status = "PASS" if result["success"] else "FAIL"
+        duration = result.get("duration_seconds", 0)
         print(
-            f"{result['task_id']}: {status} - Score: {result['score']:.2f} - Steps: {result['steps']}"
+            f"{result['task_id']}: {status} - Score: {result['score']:.2f} - "
+            f"Steps: {result['steps']} - Time: {duration:.2f}s"
         )
         total_score += result["score"]
 
     avg_score = total_score / len(results) if results else 0.0
     print(f"\nAverage Score: {avg_score:.2f}")
+    print(f"Total Execution Time: {total_duration:.2f}s ({total_duration / 60:.2f}min)")
+    print(f"End Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    print("\n" + "=" * 60)
+    print("TIMING SUMMARY")
+    print("=" * 60)
+    for timing in task_timings:
+        print(f"  {timing['task_id']}: {timing['duration_seconds']:.2f}s ({timing['steps']} steps)")
+    print(f"  Total: {total_duration:.2f}s")
 
     await client.close()
 
