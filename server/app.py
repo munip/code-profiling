@@ -1238,10 +1238,11 @@ async def run_full_episode(request: RunEpisodeRequest):
 def main():
     import uvicorn
     import os
-
+    print(f"Starting uvicorn for OpenEnv Environment API - version 1.0.0-hackathon")
     port = int(os.getenv("PORT", "7860"))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
+    print("Starting OpenEnv Environment API - version 1.0.0-hackathon")
     main()
