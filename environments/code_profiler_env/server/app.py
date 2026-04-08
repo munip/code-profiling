@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import uuid
@@ -44,18 +45,14 @@ class PerformanceGrader:
         current_memory: float,
         hotspots: List[Hotspot],
         iteration: int,
-        max_iterations: int
+        max_iterations: int,
     ) -> GraderResult:
         """
         Grade the current performance against task criteria.
         Returns normalized score between 0.0 and 1.0.
         """
         if task is None:
-            return GraderResult(
-                score=0.0,
-                passed=False,
-                feedback="No active task"
-            )
+            return GraderResult(score=0.0, passed=False, feedback="No active task")
 
         metrics = {}
         breakdown = []
@@ -72,9 +69,17 @@ class PerformanceGrader:
             if metric == "execution_time":
                 value = current_ms
                 if target > threshold:
-                    score = max(0.0, min(1.0, (threshold - value) / (threshold - target) + 1)) if value < threshold else 0.0
+                    score = (
+                        max(0.0, min(1.0, (threshold - value) / (threshold - target) + 1))
+                        if value < threshold
+                        else 0.0
+                    )
                 else:
-                    score = max(0.0, min(1.0, 1.0 - (value - target) / (threshold - target))) if value > target else 1.0
+                    score = (
+                        max(0.0, min(1.0, 1.0 - (value - target) / (threshold - target)))
+                        if value > target
+                        else 1.0
+                    )
                 metrics["execution_time_ms"] = value
 
             elif metric == "delta_percent":
@@ -89,7 +94,11 @@ class PerformanceGrader:
                     reduction = (baseline_memory - value) / baseline_memory * 100
                     score = max(0.0, min(1.0, reduction / 50.0))
                 else:
-                    score = 1.0 if value < threshold else max(0.0, 1.0 - (value - target) / (threshold - target))
+                    score = (
+                        1.0
+                        if value < threshold
+                        else max(0.0, 1.0 - (value - target) / (threshold - target))
+                    )
                 metrics["memory_usage_mb"] = value
 
             elif metric == "hotspot_reduction":
@@ -102,14 +111,16 @@ class PerformanceGrader:
                 score = 0.5
                 value = 0.0
 
-            breakdown.append({
-                "metric": metric,
-                "value": round(value, 2),
-                "target": target,
-                "threshold": threshold,
-                "score": round(score, 3),
-                "weight": weight
-            })
+            breakdown.append(
+                {
+                    "metric": metric,
+                    "value": round(value, 2),
+                    "target": target,
+                    "threshold": threshold,
+                    "score": round(score, 3),
+                    "weight": weight,
+                }
+            )
             weighted_score += score * weight
 
         final_score = weighted_score / total_weight if total_weight > 0 else 0.0
@@ -130,7 +141,7 @@ class PerformanceGrader:
             passed=passed,
             metrics=metrics,
             feedback=feedback,
-            breakdown=breakdown
+            breakdown=breakdown,
         )
 
     @staticmethod
@@ -149,7 +160,7 @@ class PerformanceGrader:
 
 app = FastAPI(
     title="Code Profiler Environment",
-    description="OpenEnv environment for iterative code profiling and performance optimization"
+    description="OpenEnv environment for iterative code profiling and performance optimization",
 )
 
 state = ProfileState(episode_id=str(uuid.uuid4()))
@@ -211,11 +222,7 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
         message=f"Task: {task.name}. Difficulty: {task.difficulty.value}. Optimize performance!",
     )
 
-    return ResetResponse(
-        observation=observation,
-        state=state,
-        available_tasks=AVAILABLE_TASKS
-    )
+    return ResetResponse(observation=observation, state=state, available_tasks=AVAILABLE_TASKS)
 
 
 def step_env(action: ProfileAction) -> StepResult:
@@ -314,7 +321,15 @@ def step_env(action: ProfileAction) -> StepResult:
             max_iterations=state.current_task.max_iterations,
         )
 
-        delta_percent = ((execution_time_ms - state.baseline_performance_ms) / state.baseline_performance_ms * 100) if state.baseline_performance_ms > 0 else 0
+        delta_percent = (
+            (
+                (execution_time_ms - state.baseline_performance_ms)
+                / state.baseline_performance_ms
+                * 100
+            )
+            if state.baseline_performance_ms > 0
+            else 0
+        )
 
         reward = grader_result.score
         cumulative_score = grader_result.score
@@ -424,17 +439,24 @@ def step_env(action: ProfileAction) -> StepResult:
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Code Profiler Environment API",
-        "status": "running",
-        "version": "1.0.0-hackathon",
-        "tasks": [t.task_id for t in AVAILABLE_TASKS]
-    }
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        content={
+            "message": "Code Profiler Environment API",
+            "status": "running",
+            "version": "1.0.0-hackathon",
+            "tasks": [t.task_id for t in AVAILABLE_TASKS],
+        },
+        media_type="application/json",
+    )
 
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(content={"status": "healthy"}, media_type="application/json")
 
 
 @app.post("/reset", response_model=ResetResponse)
@@ -491,15 +513,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if action_type == "reset":
                 response = reset_env(
-                    task_id=data.get("task_id"),
-                    language=data.get("language", "python")
+                    task_id=data.get("task_id"), language=data.get("language", "python")
                 )
-                await websocket.send_json({
-                    "type": "reset_response",
-                    "observation": response.observation.model_dump(),
-                    "state": response.state.model_dump(),
-                    "available_tasks": [t.model_dump() for t in response.available_tasks]
-                })
+                await websocket.send_json(
+                    {
+                        "type": "reset_response",
+                        "observation": response.observation.model_dump(),
+                        "state": response.state.model_dump(),
+                        "available_tasks": [t.model_dump() for t in response.available_tasks],
+                    }
+                )
 
             elif action_type == "step":
                 action = ProfileAction(**data.get("action", {}))
@@ -522,4 +545,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

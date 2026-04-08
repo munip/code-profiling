@@ -49,7 +49,8 @@ from models import ProfileAction, ProfileObservation, StepResult, AVAILABLE_TASK
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
+# For HF Spaces, the Space URL will be mapped to port 7860 internally
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 BENCHMARK = "code-profiler"
 MAX_STEPS = 8
 
@@ -62,6 +63,7 @@ class CodeProfilerClient:
 
     async def _request(self, method: str, path: str, json_data=None):
         import httpx
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             url = f"{self.base_url}{path}"
             if method == "GET":
@@ -85,7 +87,9 @@ class CodeProfilerClient:
 def format_action(action: ProfileAction) -> str:
     """Format action for logging."""
     if action.code_fix:
-        return f"{action.action_type}(language='{action.language}', fix='{action.code_fix[:30]}...')"
+        return (
+            f"{action.action_type}(language='{action.language}', fix='{action.code_fix[:30]}...')"
+        )
     return f"{action.action_type}(language='{action.language}')"
 
 
@@ -178,7 +182,10 @@ async def run_task(
 
         messages = [
             {"role": "system", "content": build_system_prompt(task)},
-            {"role": "user", "content": build_agent_prompt(observation, step_count, task.max_iterations)},
+            {
+                "role": "user",
+                "content": build_agent_prompt(observation, step_count, task.max_iterations),
+            },
         ]
 
         for iteration in range(task.max_iterations):
@@ -205,18 +212,27 @@ async def run_task(
                 done = observation.done
                 error_str = "null"
 
-                print(f"[STEP]  step={step_count} action={format_action(action)} reward={reward:.2f} done={str(done).lower()} error={error_str}")
+                print(
+                    f"[STEP]  step={step_count} action={format_action(action)} reward={reward:.2f} done={str(done).lower()} error={error_str}"
+                )
 
                 if done or observation.current_iteration >= task.max_iterations:
                     success = observation.cumulative_score >= 0.5
                     break
 
                 messages.append({"role": "assistant", "content": response_text})
-                messages.append({"role": "user", "content": build_agent_prompt(observation, step_count, task.max_iterations)})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": build_agent_prompt(observation, step_count, task.max_iterations),
+                    }
+                )
 
             except Exception as e:
                 last_error = str(e)
-                print(f"[STEP]  step={step_count} action={format_action(action)} reward=0.00 done=true error={last_error}")
+                print(
+                    f"[STEP]  step={step_count} action={format_action(action)} reward=0.00 done=true error={last_error}"
+                )
                 break
 
         final_score = observation.cumulative_score if observation.cumulative_score > 0 else 0.0
@@ -228,7 +244,9 @@ async def run_task(
         success = False
 
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
-    print(f"[END]   success={str(success).lower()} steps={step_count} score={final_score:.2f} rewards={rewards_str}")
+    print(
+        f"[END]   success={str(success).lower()} steps={step_count} score={final_score:.2f} rewards={rewards_str}"
+    )
 
     return {
         "task_id": task.task_id,
@@ -307,9 +325,9 @@ async def main():
 
     results = []
     for task in AVAILABLE_TASKS:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Running task: {task.name} ({task.difficulty.value})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         result = await run_task(client, openai_client, task, MODEL_NAME)
         results.append(result)
@@ -323,7 +341,9 @@ async def main():
     total_score = 0.0
     for result in results:
         status = "PASS" if result["success"] else "FAIL"
-        print(f"{result['task_id']}: {status} - Score: {result['score']:.2f} - Steps: {result['steps']}")
+        print(
+            f"{result['task_id']}: {status} - Score: {result['score']:.2f} - Steps: {result['steps']}"
+        )
         total_score += result["score"]
 
     avg_score = total_score / len(results) if results else 0.0
