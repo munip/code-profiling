@@ -1,6 +1,7 @@
 """FastAPI application for Code Profiler Environment - Hackathon Ready."""
 
 import sys
+import logging
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -14,6 +15,9 @@ from dataclasses import dataclass, field
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 from models import (
     AVAILABLE_TASKS,
@@ -246,6 +250,84 @@ def step_env(action: ProfileAction) -> StepResult:
 
     if action.action_type == "build":
         state.current_iteration += 1
+        logger.info(f"[BUILD] Iteration {state.current_iteration} - Language: {action.language}")
+        logger.info(f"[BUILD] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(f"[BUILD] Target functions for profiling:")
+
+        code_examples = {
+            "python": """
+# Python e-commerce API - Performance Issues:
+# File: server/python/src/app.py
+
+# Issue 1: String concatenation in loop (build_catalog_response)
+result = ""
+for item in catalog:
+    result = result + item['name'] + ","  # SLOW - creates new string each iteration
+
+# Better: result = ','.join([item['name'] for item in catalog])
+
+# Issue 2: Linear search (find_product_linear)
+def find_product_linear(products, product_id):
+    for p in products:  # O(n) - scans entire list
+        if p['id'] == product_id:
+            return p
+    return None
+
+# Better: Use dict for O(1) lookup: products_map.get(product_id)
+""",
+            "java": """
+// Java e-commerce API - Performance Issues:
+// File: server/java/src/main/java/com/example/EcommerceApi.java
+
+// Issue 1: String concatenation in loop
+String result = "";
+for (Item item : catalog) {
+    result = result + item.getName() + ",";  // SLOW - creates StringBuilder each time
+}
+
+// Better: StringBuilder or String.join()
+
+// Issue 2: Linear search
+public Product findProductLinear(List<Product> products, String id) {
+    for (Product p : products) {  // O(n) complexity
+        if (p.getId().equals(id)) return p;
+    }
+    return null;
+}
+
+// Better: Use Map<String, Product> for O(1) lookup
+""",
+            "cpp": """
+// C++ e-commerce API - Performance Issues:
+// File: server/cpp/src/main.cpp
+
+// Issue 1: Excessive string copies
+std::string build_catalog_response(const std::vector<Item>& catalog) {
+    std::string result;
+    for (const auto& item : catalog) {
+        result += item.name;  // Copies string each time
+        result += ",";
+    }
+    return result;
+}
+
+// Better: Use std::stringstream or reserve()
+
+// Issue 2: Linear search in vector
+Product* find_product_linear(const std::vector<Product>& products, const std::string& id) {
+    for (const auto& p : products) {  // O(n) complexity
+        if (p.id == id) return &p;
+    }
+    return nullptr;
+}
+
+// Better: Use std::unordered_map<std::string, Product> for O(1)
+""",
+        }
+
+        logger.info(code_examples.get(action.language, "Unknown language"))
+        logger.info(f"[BUILD] Baseline execution time: {previous_time_ms:.2f}ms")
+
         observation = ProfileObservation(
             build_status=True,
             build_output="Build successful",
@@ -261,7 +343,7 @@ def step_env(action: ProfileAction) -> StepResult:
             max_iterations=state.current_task.max_iterations if state.current_task else 5,
             language=action.language,
             task=state.current_task,
-            message=f"Build successful. Iteration {state.current_iteration}/{state.current_task.max_iterations if state.current_task else 5}",
+            message=f"Build successful. Iteration {state.current_iteration}/{state.current_task.max_iterations if state.current_task else 5}. Run 'profile' to measure performance.",
         )
 
     elif action.action_type == "profile":
@@ -292,23 +374,68 @@ def step_env(action: ProfileAction) -> StepResult:
         hotspots = [
             Hotspot(
                 function_name="build_catalog_response",
+                file_path=f"server/{action.language}/src/app.py",
+                line_number=45,
                 percentage=35.0 * multiplier,
                 self_time_ms=20.0 * multiplier,
                 total_time_ms=35.0 * multiplier,
+                call_count=150,
             ),
             Hotspot(
                 function_name="find_product_linear",
+                file_path=f"server/{action.language}/src/app.py",
+                line_number=78,
                 percentage=22.0 * multiplier,
                 self_time_ms=12.0 * multiplier,
                 total_time_ms=22.0 * multiplier,
+                call_count=85,
             ),
             Hotspot(
                 function_name="calculate_order_total",
+                file_path=f"server/{action.language}/src/app.py",
+                line_number=112,
                 percentage=18.0 * multiplier,
                 self_time_ms=10.0 * multiplier,
                 total_time_ms=18.0 * multiplier,
+                call_count=200,
             ),
         ]
+
+        logger.info(f"[PROFILE] ============================================")
+        logger.info(f"[PROFILE] Iteration {state.current_iteration} Profile Results")
+        logger.info(f"[PROFILE] Language: {action.language}")
+        logger.info(f"[PROFILE] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(f"[PROFILE] ============================================")
+        logger.info(
+            f"[PROFILE] Execution Time: {execution_time_ms:.2f}ms (baseline: {state.baseline_performance_ms:.2f}ms)"
+        )
+        logger.info(f"[PROFILE] Memory Usage: {memory_mb:.2f}MB")
+        logger.info(f"[PROFILE] Delta: {delta_percent:+.2f}%")
+        logger.info(f"[PROFILE] ============================================")
+        logger.info(f"[PROFILE] TOP HOTSPOTS (identified by profiler):")
+        logger.info(f"[PROFILE] ============================================")
+
+        for i, h in enumerate(hotspots, 1):
+            logger.info(f"[PROFILE] {i}. {h.function_name}")
+            logger.info(f"[PROFILE]    File: {h.file_path}:{h.line_number}")
+            logger.info(
+                f"[PROFILE]    Time: {h.self_time_ms:.2f}ms (self), {h.total_time_ms:.2f}ms (total)"
+            )
+            logger.info(f"[PROFILE]    Impact: {h.percentage:.1f}% of total execution time")
+            logger.info(f"[PROFILE]    Calls: {h.call_count}")
+
+            fix_suggestions = {
+                "build_catalog_response": "Use string.join() or StringBuilder instead of + concatenation",
+                "find_product_linear": "Use dict/hash map for O(1) lookup instead of O(n) loop",
+                "calculate_order_total": "Cache intermediate results, avoid repeated calculations",
+            }
+            if h.function_name in fix_suggestions:
+                logger.info(f"[PROFILE]    Fix: {fix_suggestions[h.function_name]}")
+            logger.info(f"[PROFILE] ------------------------------------------------")
+
+        logger.info(f"[PROFILE] Score: {grader_result.score:.2f}")
+        logger.info(f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}")
+        logger.info(f"[PROFILE] ============================================")
 
         grader_result = PerformanceGrader.grade_task(
             task=state.current_task,
@@ -377,6 +504,15 @@ def step_env(action: ProfileAction) -> StepResult:
         previous_memory_mb = memory_mb
 
     elif action.action_type == "fix":
+        logger.info(f"[FIX] ============================================")
+        logger.info(f"[FIX] Applying code fix - Iteration {state.current_iteration}")
+        logger.info(f"[FIX] Language: {action.language}")
+        logger.info(f"[FIX] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(
+            f"[FIX] Fix description: {action.code_fix[:200] if action.code_fix else 'No description'}"
+        )
+        logger.info(f"[FIX] Note: Run 'profile' action to measure improvement")
+        logger.info(f"[FIX] ============================================")
         observation = ProfileObservation(
             build_status=True,
             build_output="Fix applied",
@@ -392,12 +528,20 @@ def step_env(action: ProfileAction) -> StepResult:
             max_iterations=state.current_task.max_iterations if state.current_task else 5,
             language=action.language,
             task=state.current_task,
-            message=f"Fix applied: {action.code_fix[:100] if action.code_fix else 'No description'}",
+            message=f"Fix applied. Run 'profile' to measure improvement.",
         )
 
     elif action.action_type == "submit":
         done = True
         state.is_complete = True
+
+        logger.info(f"[SUBMIT] ============================================")
+        logger.info(f"[SUBMIT] Task Submission")
+        logger.info(f"[SUBMIT] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(f"[SUBMIT] Language: {action.language}")
+        logger.info(f"[SUBMIT] Total iterations: {state.current_iteration}")
+        logger.info(f"[SUBMIT] Best execution time: {state.best_performance_ms:.2f}ms")
+        logger.info(f"[SUBMIT] Baseline: {state.baseline_performance_ms:.2f}ms")
 
         if grader_result is None and state.current_task:
             grader_result = PerformanceGrader.grade_task(
@@ -416,6 +560,21 @@ def step_env(action: ProfileAction) -> StepResult:
             cumulative_score = grader_result.score
             reward = grader_result.score
 
+        improvement = (
+            (
+                (state.baseline_performance_ms - state.best_performance_ms)
+                / state.baseline_performance_ms
+                * 100
+            )
+            if state.baseline_performance_ms > 0
+            else 0
+        )
+
+        logger.info(f"[SUBMIT] Improvement: {improvement:.1f}%")
+        logger.info(f"[SUBMIT] Final Score: {state.final_score:.2f}")
+        logger.info(f"[SUBMIT] Status: {'PASS' if state.final_score >= 0.7 else 'FAIL'}")
+        logger.info(f"[SUBMIT] ============================================")
+
         observation = ProfileObservation(
             build_status=True,
             build_output="Task submitted",
@@ -431,7 +590,7 @@ def step_env(action: ProfileAction) -> StepResult:
             max_iterations=state.current_task.max_iterations if state.current_task else 5,
             language=action.language,
             task=state.current_task,
-            message=f"Task complete. Final Score: {state.final_score:.2f}",
+            message=f"Task complete. Final Score: {state.final_score:.2f} (Improvement: {improvement:.1f}%)",
         )
 
     return StepResult(observation=observation, state=state, grader_result=grader_result)
