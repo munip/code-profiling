@@ -145,8 +145,11 @@ class PythonProfiler:
             execution_time = avg_time if avg_time > 0 else duration * 1000.0
 
             if result.returncode == 0 and os.path.exists(output_file):
-                with open(output_file) as f:
-                    output = f.read()
+                try:
+                    with open(output_file, encoding="utf-8", errors="replace") as f:
+                        output = f.read()
+                except Exception:
+                    output = ""
 
                 hotspots = PythonProfiler._parse_austin_output(output, execution_time)
 
@@ -424,7 +427,9 @@ class JavaProfiler:
                 )
             else:
                 error_msg = (
-                    result.stderr.decode() if result.stderr else "async-profiler failed"
+                    result.stderr.decode("utf-8", errors="replace")
+                    if result.stderr
+                    else "async-profiler failed"
                 )
                 logger.warning(
                     f"async-profiler failed: {error_msg}, measuring actual time"
