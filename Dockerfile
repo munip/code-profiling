@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
     cmake \
-    openjdk-17-jdk-headless \
+    default-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install austin (pre-built binary for Linux x64)
