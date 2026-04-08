@@ -484,7 +484,7 @@ async def main():
     print("=" * 60)
     for timing in task_timings:
         print(f"  {timing['task_id']}: {timing['duration_seconds']:.2f}s ({timing['steps']} steps)")
-    print(f"  Total duration to complete end-to-end simulation of all code profiling tasks with OpenEnv: {total_duration:.2f}s")
+    print(f"  Total duration to complete end-to-end run of all code profiling tasks with OpenEnv: {total_duration:.2f}s")
 
     await client.close()
 

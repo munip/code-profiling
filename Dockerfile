@@ -1,11 +1,11 @@
 # Code Profiler Environment - HuggingFace Spaces Dockerfile
 # ==========================================================
-# Supports: Python, Java, C++ profiling with real profilers
+# Supports: Python, Java, C++ profiling with real profilers( async-profiler for Java, austin for Python/C++), and simulated profiling when real profilers are not available.
 # Profilers: austin (Python/C++), async-profiler (Java)
 
 FROM python:3.10-slim
 
-ARG BUILD_VERSION=11
+ARG BUILD_VERSION=2
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
