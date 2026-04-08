@@ -336,17 +336,25 @@ class ContainerManager:
 
     @classmethod
     def rebuild(cls, language: str, version: int, compose_dir: Path = None) -> bool:
-        """Rebuild a Docker container for a language."""
+        """Rebuild a Docker container for a language.
+
+        Returns False gracefully if Docker/docker-compose is not available.
+        """
+        try:
+            subprocess.run(["docker", "--version"], capture_output=True, timeout=5)
+        except Exception:
+            return False
+
+        try:
+            subprocess.run(["docker-compose", "--version"], capture_output=True, timeout=5)
+        except Exception:
+            return False
+
         if compose_dir is None:
             compose_dir = Path.cwd() / "environments" / "code_profiler_env"
 
         container = cls.CONTAINERS.get(language)
         if not container:
-            return False
-
-        try:
-            subprocess.run(["docker", "info"], capture_output=True, timeout=5)
-        except Exception:
             return False
 
         try:
