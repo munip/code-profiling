@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "code-profiler-env"
@@ -19,6 +19,7 @@ dependencies = [
     "httpx>=0.25.0",
     "openai>=1.0.0",
     "pyyaml>=6.0",
+    "openenv-core>=0.2.0",
 ]
 
 [project.optional-dependencies]
@@ -27,24 +28,15 @@ dev = [
     "pytest-asyncio>=0.21.0",
 ]
 
+[project.scripts]
+openenv-server = "code_profiler_env.server.app:main"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["code_profiler_env", "code_profiler_env.server"]
+package-dir = { "code_profiler_env" = ".", "code_profiler_env.server" = "server" }
+
 [project.urls]
 Homepage = "https://github.com/munipu/code-profiler-env"
 Documentation = "https://meta-pytorch.org/OpenEnv/"
 Repository = "https://github.com/munipu/code-profiler-env"
-
-[tool.hatch.build.targets.wheel]
-packages = ["."]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "server/",
-    "models.py",
-    "openenv.yaml",
-]
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
