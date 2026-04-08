@@ -15,7 +15,6 @@ from .models import (
     AVAILABLE_TASKS,
     TASK_MAP,
 )
-from .client import CodeProfilerEnv
 
 __all__ = [
     "ProfileAction",
@@ -32,5 +31,4 @@ __all__ = [
     "ResetResponse",
     "AVAILABLE_TASKS",
     "TASK_MAP",
-    "CodeProfilerEnv",
 ]
