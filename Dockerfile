@@ -47,7 +47,7 @@ if [ ! -f /tmp/async-profiler/bin/asprof ]; then\n\
 fi\n\
 if [ ! -f /usr/local/bin/austin ]; then\n\
     echo "Downloading austin..."\n\
-    wget -q -O /tmp/austin.tar.xz https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz\n\
+    wget -q -O /tmp/austin.tar.xz https://github.com/P403n1x87/austin/releases/download/v3.7.0/austin-3.7.0-gnu-linux-amd64.tar.xz\n\
     tar -xJf /tmp/austin.tar.xz -C /tmp && mv /tmp/austin-*/austin /usr/local/bin/austin && chmod +x /usr/local/bin/austin && rm -rf /tmp/austin*\n\
     echo "austin downloaded"\n\
 fi\n\

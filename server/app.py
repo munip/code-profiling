@@ -337,7 +337,7 @@ async def startup_event():
     if not austin_path:
         logger.info("Downloading austin...")
         try:
-            url = "https://github.com/P403n1x87/austin/releases/download/v4.0.0/austin-4.0.0-gnu-linux-amd64.tar.xz"
+            url = "https://github.com/P403n1x87/austin/releases/download/v3.7.0/austin-3.7.0-gnu-linux-amd64.tar.xz"
             Path("/tmp").mkdir(exist_ok=True)
             urllib.request.urlretrieve(url, "/tmp/austin.tar.xz")
 
