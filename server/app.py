@@ -35,12 +35,8 @@ except Exception as e:  # pragma: no cover
         "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
     ) from e
 
-try:
-    from ..models import CodeProfilerAction, CodeProfilerObservation
-    from .code_profiler_env_environment import CodeProfilerEnvironment
-except ModuleNotFoundError:
-    from models import CodeProfilerAction, CodeProfilerObservation
-    from server.code_profiler_env_environment import CodeProfilerEnvironment
+from models import CodeProfilerAction, CodeProfilerObservation
+from server.code_profiler_env_environment import CodeProfilerEnvironment
 
 
 # Create the app with web interface and README integration
