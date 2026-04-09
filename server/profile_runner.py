@@ -202,52 +202,99 @@ class PythonProfiler:
 
     @staticmethod
     def _parse_austin_output(output: str, total_time_ms: float) -> List[Hotspot]:
-        """Parse austin output format. Each line: stack_trace;samples."""
+        """Parse austin collapsed stack format: frame1;frame2;frameN;[metric]"""
         hotspots = []
+        seen_funcs = {}
+
         for line in output.split("\n"):
-            if not line or line.startswith("#") or line.count(";") > 100:
+            line = line.strip()
+            if not line or line.startswith("#"):
                 continue
 
-            parts = line.split(";")
-            if len(parts) < 2:
+            # Austin collapsed format: frame1;frame2;...;[metric] or frame1;frame2;...;metric
+            # Extract metric (time in microseconds, in square brackets at end)
+            if "[" in line and "]" in line:
+                metric_str = line[line.rfind("[") + 1 : line.rfind("]")]
+                try:
+                    time_us = float(metric_str)
+                except ValueError:
+                    time_us = 0.0
+                # Remove the metric part to get the stack
+                stack_part = line[: line.rfind("[")].rstrip(";")
+            else:
+                # No metric brackets - skip or try alternative parsing
+                parts = line.split(";")
+                if len(parts) >= 2:
+                    try:
+                        time_us = float(parts[-1])
+                        stack_part = ";".join(parts[:-1])
+                    except ValueError:
+                        continue
+                else:
+                    continue
+
+            if not stack_part:
                 continue
 
-            try:
-                stack = parts[0].strip()
-                samples = int(parts[-1].strip()) if parts[-1].strip().isdigit() else 0
+            # Split stack by semicolon to get individual frames
+            frames = [f.strip() for f in stack_part.split(";") if f.strip()]
+            if not frames:
+                continue
 
-                func_name = stack.split("->")[-1].strip() if "->" in stack else stack
-                if not func_name or func_name in (
-                    "python3",
-                    "python",
-                    "PyRun_SimpleFileExFlags",
-                    "__libc_start_main",
+            # Get the innermost Python function (skip C frames)
+            func_name = None
+            file_path = "app.py"
+            for frame in reversed(frames):
+                # Skip known non-Python frames
+                if any(
+                    skip in frame
+                    for skip in ("python", "PyRun", "libc", "main", "start_thread")
                 ):
-                    func_name = (
-                        stack.split(";")[-2].strip()
-                        if len(stack.split(";")) > 1
-                        else func_name
-                    )
+                    continue
+                # Parse frame like "module.py:123" or "function"
+                if ":" in frame:
+                    func_name = frame.split(":")[0]
+                    # Extract line number if present
+                    try:
+                        line_num = int(frame.split(":")[-1])
+                    except ValueError:
+                        line_num = None
+                    file_path = func_name
+                    if line_num:
+                        file_path = f"{func_name}:{line_num}"
+                else:
+                    func_name = frame
+                break
 
-                hotspots.append(
-                    Hotspot(
-                        function_name=func_name,
-                        file_path="app.py",
-                        line_number=None,
-                        self_time_ms=samples * 0.5,
-                        total_time_ms=samples * 0.5,
-                        call_count=samples,
-                        percentage=0.0,
-                    )
+            if not func_name:
+                func_name = frames[-1] if frames else "unknown"
+
+            # Aggregate by function
+            if func_name in seen_funcs:
+                seen_funcs[func_name].call_count += 1
+                seen_funcs[func_name].self_time_ms += time_us / 1000.0
+            else:
+                seen_funcs[func_name] = Hotspot(
+                    function_name=func_name,
+                    file_path=file_path,
+                    line_number=None,
+                    self_time_ms=time_us / 1000.0,
+                    total_time_ms=time_us / 1000.0,
+                    call_count=1,
+                    percentage=0.0,
                 )
-            except (ValueError, IndexError):
-                continue
+
+        hotspots = list(seen_funcs.values())
+        if not hotspots:
+            return PythonProfiler._generate_hotspots(total_time_ms)
 
         total_samples = sum(h.call_count for h in hotspots) or 1
+        total_time = sum(h.self_time_ms for h in hotspots) or 1
         for h in hotspots:
-            h.percentage = (h.call_count / total_samples) * 100
+            h.percentage = (h.self_time_ms / total_time) * 100
+            h.total_time_ms = h.self_time_ms * 1.1
 
-        return sorted(hotspots, key=lambda h: h.call_count, reverse=True)[:10]
+        return sorted(hotspots, key=lambda h: h.self_time_ms, reverse=True)[:10]
 
     @staticmethod
     def _fallback_profile(execution_time_ms: float) -> ProfileResult:
@@ -732,48 +779,88 @@ class CppProfiler:
 
     @staticmethod
     def _parse_austin_output(output: str) -> List[Hotspot]:
-        """Parse austin output for C++."""
+        """Parse austin collapsed stack format for C++."""
         hotspots = []
+        seen_funcs = {}
 
         for line in output.split("\n"):
-            if not line or line.startswith("#") or line.count(";") > 100:
+            line = line.strip()
+            if not line or line.startswith("#"):
                 continue
 
-            parts = line.split(";")
-            if len(parts) < 2:
+            # Extract metric from brackets [metric]
+            if "[" in line and "]" in line:
+                metric_str = line[line.rfind("[") + 1 : line.rfind("]")]
+                try:
+                    time_us = float(metric_str)
+                except ValueError:
+                    time_us = 0.0
+                stack_part = line[: line.rfind("[")].rstrip(";")
+            else:
+                parts = line.split(";")
+                if len(parts) >= 2:
+                    try:
+                        time_us = float(parts[-1])
+                        stack_part = ";".join(parts[:-1])
+                    except ValueError:
+                        continue
+                else:
+                    continue
+
+            if not stack_part:
                 continue
 
-            try:
-                stack = parts[0].strip()
-                samples = int(parts[-1].strip()) if parts[-1].strip().isdigit() else 0
+            frames = [f.strip() for f in stack_part.split(";") if f.strip()]
+            if not frames:
+                continue
 
-                func_name = stack.split("->")[-1].strip() if "->" in stack else stack
-                if not func_name or func_name in ("__libc_start_main", "main"):
-                    func_name = (
-                        stack.split(";")[-2].strip()
-                        if len(stack.split(";")) > 1
-                        else func_name
-                    )
+            # Get innermost C++ function
+            func_name = None
+            file_path = "main.cpp"
+            for frame in reversed(frames):
+                if any(skip in frame for skip in ("libc", "start", "main")):
+                    continue
+                if ":" in frame:
+                    func_name = frame.split(":")[0]
+                    try:
+                        line_num = int(frame.split(":")[-1])
+                    except ValueError:
+                        line_num = None
+                    file_path = func_name
+                    if line_num:
+                        file_path = f"{func_name}:{line_num}"
+                else:
+                    func_name = frame
+                break
 
-                hotspots.append(
-                    Hotspot(
-                        function_name=func_name,
-                        file_path="main.cpp",
-                        line_number=None,
-                        self_time_ms=samples * 0.5,
-                        total_time_ms=samples * 0.5,
-                        call_count=samples,
-                        percentage=0.0,
-                    )
+            if not func_name:
+                func_name = frames[-1] if frames else "unknown"
+
+            if func_name in seen_funcs:
+                seen_funcs[func_name].call_count += 1
+                seen_funcs[func_name].self_time_ms += time_us / 1000.0
+            else:
+                seen_funcs[func_name] = Hotspot(
+                    function_name=func_name,
+                    file_path=file_path,
+                    line_number=None,
+                    self_time_ms=time_us / 1000.0,
+                    total_time_ms=time_us / 1000.0,
+                    call_count=1,
+                    percentage=0.0,
                 )
-            except (ValueError, IndexError):
-                continue
+
+        hotspots = list(seen_funcs.values())
+        if not hotspots:
+            return CppProfiler._generate_hotspots(5000.0)
 
         total_samples = sum(h.call_count for h in hotspots) or 1
+        total_time = sum(h.self_time_ms for h in hotspots) or 1
         for h in hotspots:
-            h.percentage = (h.call_count / total_samples) * 100
+            h.percentage = (h.self_time_ms / total_time) * 100
+            h.total_time_ms = h.self_time_ms * 1.1
 
-        return sorted(hotspots, key=lambda h: h.call_count, reverse=True)[:10]
+        return sorted(hotspots, key=lambda h: h.self_time_ms, reverse=True)[:10]
 
     @staticmethod
     def _fallback_profile(execution_time_ms: float) -> ProfileResult:
