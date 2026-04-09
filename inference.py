@@ -40,10 +40,10 @@ STDOUT FORMAT
 
   Example:
     [START] task=python-string-concat-easy env=code-profiler model=Qwen3-72B
-    [STEP]  step=1 action=build(language='python') reward=0.00 done=false error=null
+    [STEP]  step=1 action=build(language='python') reward=0.01 done=false error=null
     [STEP]  step=2 action=profile(language='python') reward=0.65 done=false error=null
     [STEP]  step=3 action=fix(code_fix='Use join()') reward=0.85 done=true error=null
-    [END]   success=true steps=3 score=0.85 rewards=0.00,0.65,0.85
+    [END]   success=true steps=3 score=0.85 rewards=0.01,0.65,0.85
 """
 
 import argparse
@@ -330,7 +330,7 @@ async def run_task_full(
 
     except Exception as e:
         print(f"[ERROR] Full episode failed: {type(e).__name__}: {e}")
-        print(f"[END]   success=false steps=0 score=0.00 rewards=0.00")
+        print(f"[END]   success=false steps=0 score=0.01 rewards=0.01")
         return {
             "task_id": task.task_id,
             "success": False,
@@ -434,7 +434,7 @@ async def run_task_hybrid(
 
     except Exception as e:
         last_error = str(e)
-        final_score = 0.0
+        final_score = 0.01
         success = False
 
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
