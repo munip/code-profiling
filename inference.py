@@ -313,7 +313,7 @@ async def run_task_full(
         final_score = score if score > 0 else 0.0
         success = final_score >= 0.5
 
-        rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
+        rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.01"
         print(
             f"[END]   success={str(success).lower()} steps={step_count} "
             f"score={final_score:.2f} rewards={rewards_str}"
@@ -437,7 +437,7 @@ async def run_task_hybrid(
         final_score = 0.01
         success = False
 
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.01"
     print(
         f"[END]   success={str(success).lower()} steps={step_count} "
         f"score={final_score:.2f} rewards={rewards_str}"
