@@ -422,7 +422,7 @@ async def run_task_hybrid(
             except Exception as e:
                 last_error = str(e)
                 print(
-                    f"[STEP]  step={step_count} action={format_action(action)} reward=0.00 "
+                    f"[STEP]  step={step_count} action={format_action(action)} reward=0.01 "
                     f"done=true error={last_error}"
                 )
                 break
