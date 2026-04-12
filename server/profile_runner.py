@@ -399,8 +399,11 @@ class JavaProfiler:
             logger.warning("async-profiler not installed")
             return None
 
-        if not os.path.exists(JAVA_CLASSPATH):
-            logger.warning(f"Java classpath not found: {JAVA_CLASSPATH}")
+        if not os.path.exists(JAVA_SRC_PATH):
+            logger.warning(f"Java source path not found: {JAVA_SRC_PATH}")
+            return None
+        if not os.path.exists("/app/java_classes"):
+            logger.warning(f"Java classes path not found: /app/java_classes")
             return None
 
         try:

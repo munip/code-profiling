@@ -14,7 +14,7 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 
 WORKDIR /app
 
-# Install system dependencies, Java, and perf for C++ profiling
+# Install system dependencies and Java
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     default-jdk-headless \
-    linux-perf \
     && rm -rf /var/lib/apt/lists/*
 
 # Create startup script to download profilers at runtime (not build time)
