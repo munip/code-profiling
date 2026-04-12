@@ -114,6 +114,35 @@ class GitManager:
         except Exception as e:
             self._logger.warning(f"[GIT] Baseline commit may have failed: {e}")
 
+def restore_baseline(self):
+        """Restore code to baseline commit."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-list", "--max-parents=1", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            baseline_sha = result.stdout.strip().split("\n")[0] if result.stdout else None
+            
+            if baseline_sha:
+                subprocess.run(
+                    ["git", "checkout", baseline_sha, "--", "."],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                    timeout=10,
+                )
+                self._logger.info(f"[GIT] Restored to baseline: {baseline_sha}")
+                return True
+            else:
+                self._logger.warning("[GIT] No baseline commit found")
+                return False
+        except Exception as e:
+            self._logger.warning(f"[GIT] Restore failed: {e}")
+            return False
+
     def commit(self, message: str, allow_empty: bool = True) -> str:
         """Commit with iteration message. Always commits to track iteration history."""
         try:
@@ -127,6 +156,23 @@ class GitManager:
                 if not status_result.stdout.strip():
                     self._logger.info("[GIT] No changes to commit")
                     return ""
+
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+            )
+            result = subprocess.run(
+                ["git", "commit", "-m", message, "--allow-empty"],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                self._logger.error(f"[GIT] Commit failed: {result.stderr}")
+                return ""
 
             subprocess.run(
                 ["git", "add", "-A"],

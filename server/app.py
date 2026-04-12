@@ -470,6 +470,9 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
 
     _copy_baseline_templates(language)
 
+    git_manager = GitManager()
+    git_manager.restore_baseline()
+
     state = ProfileState(
         episode_id=str(uuid.uuid4()),
         step_count=0,
