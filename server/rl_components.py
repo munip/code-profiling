@@ -135,6 +135,20 @@ def restore_baseline(self):
                     timeout=10,
                 )
                 self._logger.info(f"[GIT] Restored to baseline: {baseline_sha}")
+                
+                # Commit the restore to track reset events
+                subprocess.run(
+                    ["git", "add", "-A"],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", "reset: restored to baseline code", "--allow-empty"],
+                    cwd=self.repo_path,
+                    check=True,
+                    capture_output=True,
+                )
                 return True
             else:
                 self._logger.warning("[GIT] No baseline commit found")
