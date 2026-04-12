@@ -13,8 +13,8 @@ project_root = app_dir.parent
 
 if "/app" not in sys.path:
     sys.path.insert(0, "/app")
-if str(app_dir) not in sys.path:
-    sys.path.insert(0, str(app_dir))
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 import uuid
 from datetime import datetime
@@ -346,8 +346,15 @@ async def startup_event():
 
             before = set(glob.glob("/tmp/*"))
 
+            # Clean up existing austin directory if it exists
+            for old_dir in glob.glob("/tmp/austin*"):
+                if Path(old_dir).is_dir():
+                    import shutil
+
+                    shutil.rmtree(old_dir)
+
             subprocess.run(
-                ["tar", "-xJf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
+                ["tar", "-xf", "/tmp/austin.tar.xz", "-C", "/tmp"], check=True
             )
 
             # List what's in /tmp after extraction
