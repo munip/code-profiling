@@ -19,7 +19,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 from models import (
@@ -98,20 +100,29 @@ class PerformanceGrader:
                 value = current_ms
                 if target > threshold:
                     score = (
-                        max(0.0, min(1.0, (threshold - value) / (threshold - target) + 1))
+                        max(
+                            0.0,
+                            min(1.0, (threshold - value) / (threshold - target) + 1),
+                        )
                         if value < threshold
                         else 0.0
                     )
                 else:
                     score = (
-                        max(0.0, min(1.0, 1.0 - (value - target) / (threshold - target)))
+                        max(
+                            0.0, min(1.0, 1.0 - (value - target) / (threshold - target))
+                        )
                         if value > target
                         else 1.0
                     )
                 metrics["execution_time_ms"] = value
 
             elif metric == "delta_percent":
-                delta = ((current_ms - baseline_ms) / baseline_ms * 100) if baseline_ms > 0 else 0
+                delta = (
+                    ((current_ms - baseline_ms) / baseline_ms * 100)
+                    if baseline_ms > 0
+                    else 0
+                )
                 value = -delta
                 score = max(0.0, min(1.0, value / abs(target))) if target > 0 else 0.0
                 metrics["delta_percent"] = delta
@@ -162,7 +173,9 @@ class PerformanceGrader:
             iteration_bonus = remaining * 0.02
             final_score = min(1.0, final_score + iteration_bonus)
 
-        feedback = PerformanceGrader._generate_feedback(task, breakdown, final_score, passed)
+        feedback = PerformanceGrader._generate_feedback(
+            task, breakdown, final_score, passed
+        )
 
         return GraderResult(
             score=round(final_score, 3),
@@ -173,7 +186,9 @@ class PerformanceGrader:
         )
 
     @staticmethod
-    def _generate_feedback(task: Task, breakdown: List[Dict], score: float, passed: bool) -> str:
+    def _generate_feedback(
+        task: Task, breakdown: List[Dict], score: float, passed: bool
+    ) -> str:
         """Generate human-readable feedback."""
         if passed:
             return f"Task '{task.name}' completed successfully! Score: {score:.2f}"
@@ -191,8 +206,12 @@ class RunEpisodeRequest(BaseModel):
 
     task_id: Optional[str] = Field(default=None, description="Task ID to run")
     language: str = Field(default="python", description="Target programming language")
-    max_iterations: int = Field(default=5, ge=1, le=7, description="Maximum iterations (1-7)")
-    execution_mode: str = Field(default="full", description="Execution mode: full or hybrid")
+    max_iterations: int = Field(
+        default=5, ge=1, le=7, description="Maximum iterations (1-7)"
+    )
+    execution_mode: str = Field(
+        default="full", description="Execution mode: full or hybrid"
+    )
 
 
 class EpisodeIterationResponse(BaseModel):
@@ -323,7 +342,9 @@ def reset_env(task_id: Optional[str] = None, language: str = "python") -> ResetR
         message=f"Task: {task.name}. Difficulty: {task.difficulty.value}. Optimize performance!",
     )
 
-    return ResetResponse(observation=observation, state=state, available_tasks=AVAILABLE_TASKS)
+    return ResetResponse(
+        observation=observation, state=state, available_tasks=AVAILABLE_TASKS
+    )
 
 
 def _copy_baseline_templates(language: str):
@@ -339,7 +360,14 @@ def _copy_baseline_templates(language: str):
         dest = base_dir / "server" / "python" / "src" / "app.py"
     elif language == "java":
         dest = (
-            base_dir / "server" / "java" / "src" / "com" / "ecommerce" / "api" / "ECommerceAPI.java"
+            base_dir
+            / "server"
+            / "java"
+            / "src"
+            / "com"
+            / "ecommerce"
+            / "api"
+            / "ECommerceAPI.java"
         )
     elif language == "cpp":
         dest = base_dir / "server" / "cpp" / "src" / "main.cpp"
@@ -419,9 +447,17 @@ def _get_simulated_profile(state: ProfileState, language: str) -> tuple:
     }
 
     func_map = {
-        "python": ("build_catalog_response", "find_product_by_id_linear", "calculate_order_total"),
+        "python": (
+            "build_catalog_response",
+            "find_product_by_id_linear",
+            "calculate_order_total",
+        ),
         "java": ("buildCatalogResponse", "findProductLinear", "calculateOrderTotal"),
-        "cpp": ("build_catalog_response", "find_product_linear", "calculate_order_total"),
+        "cpp": (
+            "build_catalog_response",
+            "find_product_linear",
+            "calculate_order_total",
+        ),
     }
 
     lang = language.lower()
@@ -482,8 +518,12 @@ def step_env(action: ProfileAction) -> StepResult:
 
     if action.action_type == "build":
         state.current_iteration += 1
-        logger.info(f"[BUILD] Iteration {state.current_iteration} - Language: {action.language}")
-        logger.info(f"[BUILD] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(
+            f"[BUILD] Iteration {state.current_iteration} - Language: {action.language}"
+        )
+        logger.info(
+            f"[BUILD] Task: {state.current_task.name if state.current_task else 'None'}"
+        )
         logger.info(f"[BUILD] Target functions for profiling:")
 
         code_examples = {
@@ -572,7 +612,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             delta_percent=0.0,
             done=False,
             current_iteration=state.current_iteration,
-            max_iterations=state.current_task.max_iterations if state.current_task else 5,
+            max_iterations=state.current_task.max_iterations
+            if state.current_task
+            else 5,
             language=action.language,
             task=state.current_task,
             message=f"Build successful. Iteration {state.current_iteration}/{state.current_task.max_iterations if state.current_task else 5}. Run 'profile' to measure performance.",
@@ -581,15 +623,21 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
     elif action.action_type == "profile":
         if state.current_task is None:
             observation.error = "No active task"
-            return StepResult(observation=observation, state=state, grader_result=grader_result)
+            return StepResult(
+                observation=observation, state=state, grader_result=grader_result
+            )
 
         state.current_iteration += 1
 
+        profiler_output_raw = None
         if ProfileRunner and APIS_AVAILABLE:
             try:
-                profile_result = ProfileRunner.profile(language=action.language, duration=5)
+                profile_result = ProfileRunner.profile(
+                    language=action.language, duration=5
+                )
                 if profile_result.success:
                     execution_time_ms = profile_result.execution_time_ms
+                    profiler_output_raw = profile_result.output
                     hotspots = [
                         Hotspot(
                             function_name=h.function_name,
@@ -603,10 +651,14 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
                         for h in profile_result.hotspots
                     ]
                 else:
-                    execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
+                    execution_time_ms, hotspots = _get_simulated_profile(
+                        state, action.language
+                    )
             except Exception as e:
                 logger.warning(f"ProfileRunner failed: {e}, using simulated data")
-                execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
+                execution_time_ms, hotspots = _get_simulated_profile(
+                    state, action.language
+                )
         else:
             execution_time_ms, hotspots = _get_simulated_profile(state, action.language)
 
@@ -630,7 +682,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         logger.info(f"[PROFILE] ============================================")
         logger.info(f"[PROFILE] Iteration {state.current_iteration} Profile Results")
         logger.info(f"[PROFILE] Language: {action.language}")
-        logger.info(f"[PROFILE] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(
+            f"[PROFILE] Task: {state.current_task.name if state.current_task else 'None'}"
+        )
         logger.info(f"[PROFILE] ============================================")
         logger.info(
             f"[PROFILE] Execution Time: {execution_time_ms:.2f}ms (baseline: {state.baseline_performance_ms:.2f}ms)"
@@ -647,7 +701,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             logger.info(
                 f"[PROFILE]    Time: {h.self_time_ms:.2f}ms (self), {h.total_time_ms:.2f}ms (total)"
             )
-            logger.info(f"[PROFILE]    Impact: {h.percentage:.1f}% of total execution time")
+            logger.info(
+                f"[PROFILE]    Impact: {h.percentage:.1f}% of total execution time"
+            )
             logger.info(f"[PROFILE]    Calls: {h.call_count}")
 
             fix_suggestions = {
@@ -671,7 +727,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         )
 
         logger.info(f"[PROFILE] Score: {grader_result.score:.2f}")
-        logger.info(f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}")
+        logger.info(
+            f"[PROFILE] Status: {'PASS' if grader_result.passed else 'IN PROGRESS'}"
+        )
         logger.info(f"[PROFILE] ============================================")
 
         git_manager = GitManager()
@@ -711,7 +769,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             iteration=state.current_iteration,
             language=action.language,
             build_success=True,
-            profiler_output="Profile complete",
+            profiler_output=profiler_output_raw
+            if profiler_output_raw
+            else "Profiling complete",
             hotspots=hotspots,
             execution_time_ms=execution_time_ms,
             memory_usage_mb=memory_mb,
@@ -732,7 +792,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         observation = ProfileObservation(
             build_status=True,
             build_output="Build successful",
-            profiler_output="Profile complete",
+            profiler_output=profiler_output_raw
+            if profiler_output_raw
+            else "Profiling complete",
             hotspots=hotspots,
             execution_time_ms=execution_time_ms,
             memory_usage_mb=memory_mb,
@@ -755,7 +817,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         logger.info(f"[FIX] ============================================")
         logger.info(f"[FIX] Applying code fix - Iteration {state.current_iteration}")
         logger.info(f"[FIX] Language: {action.language}")
-        logger.info(f"[FIX] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(
+            f"[FIX] Task: {state.current_task.name if state.current_task else 'None'}"
+        )
         logger.info(
             f"[FIX] Fix description: {action.code_fix[:200] if action.code_fix else 'No description'}"
         )
@@ -773,7 +837,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             delta_percent=0.0,
             done=False,
             current_iteration=state.current_iteration,
-            max_iterations=state.current_task.max_iterations if state.current_task else 5,
+            max_iterations=state.current_task.max_iterations
+            if state.current_task
+            else 5,
             language=action.language,
             task=state.current_task,
             message=f"Fix applied. Run 'profile' to measure improvement.",
@@ -785,7 +851,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
 
         logger.info(f"[SUBMIT] ============================================")
         logger.info(f"[SUBMIT] Task Submission")
-        logger.info(f"[SUBMIT] Task: {state.current_task.name if state.current_task else 'None'}")
+        logger.info(
+            f"[SUBMIT] Task: {state.current_task.name if state.current_task else 'None'}"
+        )
         logger.info(f"[SUBMIT] Language: {action.language}")
         logger.info(f"[SUBMIT] Total iterations: {state.current_iteration}")
         logger.info(f"[SUBMIT] Best execution time: {state.best_performance_ms:.2f}ms")
@@ -820,7 +888,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
 
         logger.info(f"[SUBMIT] Improvement: {improvement:.1f}%")
         logger.info(f"[SUBMIT] Final Score: {state.final_score:.2f}")
-        logger.info(f"[SUBMIT] Status: {'PASS' if state.final_score >= 0.7 else 'FAIL'}")
+        logger.info(
+            f"[SUBMIT] Status: {'PASS' if state.final_score >= 0.7 else 'FAIL'}"
+        )
         logger.info(f"[SUBMIT] ============================================")
 
         observation = ProfileObservation(
@@ -835,7 +905,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
             delta_percent=0.0,
             done=True,
             current_iteration=state.current_iteration,
-            max_iterations=state.current_task.max_iterations if state.current_task else 5,
+            max_iterations=state.current_task.max_iterations
+            if state.current_task
+            else 5,
             language=action.language,
             task=state.current_task,
             message=f"Task complete. Final Score: {state.final_score:.2f} (Improvement: {improvement:.1f}%)",
@@ -927,7 +999,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         "type": "reset_response",
                         "observation": response.observation.model_dump(),
                         "state": response.state.model_dump(),
-                        "available_tasks": [t.model_dump() for t in response.available_tasks],
+                        "available_tasks": [
+                            t.model_dump() for t in response.available_tasks
+                        ],
                     }
                 )
 
@@ -1094,11 +1168,19 @@ async def run_full_episode(request: RunEpisodeRequest):
         iteration_responses.append(iter_response)
 
         if iteration >= max_iter and net_positive_achieved:
-            logger.info(f"[EPISODE] Stopping at iteration {iteration} - net positive achieved")
+            logger.info(
+                f"[EPISODE] Stopping at iteration {iteration} - net positive achieved"
+            )
             break
 
-    final_ms = iteration_responses[-1].execution_time_ms if iteration_responses else baseline_ms
-    improvement_percent = ((baseline_ms - final_ms) / baseline_ms * 100) if baseline_ms > 0 else 0
+    final_ms = (
+        iteration_responses[-1].execution_time_ms
+        if iteration_responses
+        else baseline_ms
+    )
+    improvement_percent = (
+        ((baseline_ms - final_ms) / baseline_ms * 100) if baseline_ms > 0 else 0
+    )
 
     total_reward = sum(r.step_reward for r in iteration_responses[1:])
     score = iteration_responses[-1].reward if iteration_responses else 0.0
@@ -1131,7 +1213,9 @@ async def run_full_episode(request: RunEpisodeRequest):
 
     report_content = report_gen.generate_report(episode_report)
 
-    logger.info(f"[EPISODE] Episode complete - score: {score:.2f}, reward: {total_reward:.3f}")
+    logger.info(
+        f"[EPISODE] Episode complete - score: {score:.2f}, reward: {total_reward:.3f}"
+    )
 
     return RunEpisodeResponse(
         episode_id=str(uuid.uuid4()),

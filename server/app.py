@@ -826,6 +826,7 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
 
         state.current_iteration += 1
 
+        profiler_output_raw = None
         if ProfileRunner and APIS_AVAILABLE:
             try:
                 profile_result = ProfileRunner.profile(
@@ -833,6 +834,7 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
                 )
                 if profile_result.success:
                     execution_time_ms = profile_result.execution_time_ms
+                    profiler_output_raw = profile_result.output
                     hotspots = [
                         Hotspot(
                             function_name=h.function_name,
@@ -987,7 +989,9 @@ Product* find_product_linear(const std::vector<Product>& products, const std::st
         observation = ProfileObservation(
             build_status=True,
             build_output="Build successful",
-            profiler_output="Profile complete",
+            profiler_output=profiler_output_raw
+            if profiler_output_raw
+            else "Profiling complete",
             hotspots=hotspots,
             execution_time_ms=execution_time_ms,
             memory_usage_mb=memory_mb,
@@ -1356,8 +1360,16 @@ async def run_full_episode(request: RunEpisodeRequest):
         # Calculate step_reward based on outcome match
         # delta_percent < 0 means faster (good), > 0 means slower (bad)
         # baseline outcome gets cumulative_score (now guaranteed >= 0.01)
+        # For "remove": if previous was "degrade" (went backwards), give half improve
+        #              if previous was "improve", give minimal (0.01) - only reverting to baseline
         if outcome == "degrade":
             step_reward = 0.01
+        elif outcome == "remove":
+            last_outcome = outcome_history[-1] if outcome_history else ""
+            if last_outcome == "degrade":
+                step_reward = max(0.01, obs.cumulative_score * 0.5)
+            else:
+                step_reward = 0.01
         elif outcome == "baseline":
             step_reward = obs.cumulative_score
         elif delta_percent < 0:
@@ -1459,7 +1471,9 @@ def main():
     import uvicorn
     import os
 
-    print(f"Starting uvicorn for OpenEnv Environment for code profiling - version 1.0.0-hackathon")
+    print(
+        f"Starting uvicorn for OpenEnv Environment for code profiling - version 1.0.0-hackathon"
+    )
     port = int(os.getenv("PORT", "7860"))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
