@@ -114,7 +114,7 @@ class GitManager:
         except Exception as e:
             self._logger.warning(f"[GIT] Baseline commit may have failed: {e}")
 
-def restore_baseline(self):
+    def restore_baseline(self):
         """Restore code to baseline commit."""
         try:
             result = subprocess.run(
@@ -124,8 +124,10 @@ def restore_baseline(self):
                 text=True,
                 timeout=5,
             )
-            baseline_sha = result.stdout.strip().split("\n")[0] if result.stdout else None
-            
+            baseline_sha = (
+                result.stdout.strip().split("\n")[0] if result.stdout else None
+            )
+
             if baseline_sha:
                 subprocess.run(
                     ["git", "checkout", baseline_sha, "--", "."],
@@ -135,7 +137,7 @@ def restore_baseline(self):
                     timeout=10,
                 )
                 self._logger.info(f"[GIT] Restored to baseline: {baseline_sha}")
-                
+
                 # Commit the restore to track reset events
                 subprocess.run(
                     ["git", "add", "-A"],
@@ -144,7 +146,13 @@ def restore_baseline(self):
                     capture_output=True,
                 )
                 subprocess.run(
-                    ["git", "commit", "-m", "reset: restored to baseline code", "--allow-empty"],
+                    [
+                        "git",
+                        "commit",
+                        "-m",
+                        "reset: restored to baseline code",
+                        "--allow-empty",
+                    ],
                     cwd=self.repo_path,
                     check=True,
                     capture_output=True,
