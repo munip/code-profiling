@@ -432,21 +432,21 @@ class JavaProfiler:
 
         Usage: profiler.sh -d <duration> -f <output.html> -e cpu <pid>
         """
-        # First measure actual execution time via HTTP requests (like PythonProfiler does)
-        avg_time = JavaProfiler.profile_request(
-            duration=min(duration, 3)
-        ).execution_time_ms
-
         pid = JavaProfiler._ensure_java_running()
 
         if pid is None:
-            # Measure actual Java execution time
             avg_time = measure_console_execution_time(
                 ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
                 warmup_runs=1,
                 measure_runs=3,
             )
             return JavaProfiler._fallback_profile(avg_time if avg_time > 0 else 5000.0)
+
+        avg_time = measure_console_execution_time(
+            ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
+            warmup_runs=1,
+            measure_runs=3,
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
             output_file = f.name
@@ -493,11 +493,6 @@ class JavaProfiler:
                 )
 
         except subprocess.TimeoutExpired:
-            avg_time = measure_console_execution_time(
-                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
-                warmup_runs=1,
-                measure_runs=3,
-            )
             return ProfileResult(
                 success=False,
                 execution_time_ms=avg_time if avg_time > 0 else duration * 1000.0,
@@ -505,24 +500,12 @@ class JavaProfiler:
                 error="Profile timed out",
             )
         except FileNotFoundError:
-            logger.warning(
-                "async-profiler not found, measuring actual Java execution time"
-            )
-            avg_time = measure_console_execution_time(
-                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
-                warmup_runs=1,
-                measure_runs=3,
-            )
+            logger.warning("async-profiler not found, using pre-measured time")
             return JavaProfiler._fallback_profile(
                 avg_time if avg_time > 0 else duration * 1000.0
             )
         except Exception as e:
-            logger.warning(f"async-profiler error: {e}, measuring actual time")
-            avg_time = measure_console_execution_time(
-                ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
-                warmup_runs=1,
-                measure_runs=3,
-            )
+            logger.warning(f"async-profiler error: {e}, using pre-measured time")
             return JavaProfiler._fallback_profile(
                 avg_time if avg_time > 0 else duration * 1000.0
             )
