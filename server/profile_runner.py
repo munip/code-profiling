@@ -1,6 +1,5 @@
 """
-Unified Profile Runner for Code Profiler Environment.
-
+Unified Profile Runner for Code Profiler Environment (v2).
 Provides profiling capabilities for Python, Java, and C++ code using:
 - austin: Frame sampler for Python and C++
 - async-profiler: CPU/memory profiler for Java
