@@ -432,6 +432,11 @@ class JavaProfiler:
 
         Usage: profiler.sh -d <duration> -f <output.html> -e cpu <pid>
         """
+        # First measure actual execution time via HTTP requests (like PythonProfiler does)
+        avg_time = JavaProfiler.profile_request(
+            duration=min(duration, 3)
+        ).execution_time_ms
+
         pid = JavaProfiler._ensure_java_running()
 
         if pid is None:
@@ -470,7 +475,7 @@ class JavaProfiler:
 
                 return ProfileResult(
                     success=True,
-                    execution_time_ms=duration * 1000.0,
+                    execution_time_ms=avg_time if avg_time > 0 else duration * 1000.0,
                     hotspots=hotspots,
                     output=output[:1000],
                 )
@@ -481,12 +486,7 @@ class JavaProfiler:
                     else "async-profiler failed"
                 )
                 logger.warning(
-                    f"async-profiler failed: {error_msg}, measuring actual time"
-                )
-                avg_time = measure_console_execution_time(
-                    ["java", "-cp", JAVA_CLASSPATH, JAVA_MAIN_CLASS],
-                    warmup_runs=1,
-                    measure_runs=3,
+                    f"async-profiler failed: {error_msg}, using pre-measured time"
                 )
                 return JavaProfiler._fallback_profile(
                     avg_time if avg_time > 0 else duration * 1000.0
