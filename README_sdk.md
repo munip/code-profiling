@@ -19,7 +19,7 @@ model_index:
 
 # Code Profiler Environment
 
-An OpenEnv RL environment for iterative code profiling and performance optimization. Agents learn to identify and fix performance bottlenecks based on code profiler runs. To start with support is available for Python, Java, and C++ code. Currently, async_profiler are used as profilers for Java and austin for Python and C++.
+An OpenEnv RL environment for iterative code profiling and performance optimization of coding agent/tools generated code. Agents with the help of OpenEnv rewards feedback learn to identify and fix performance bottlenecks based on code profiler runs. To start with support is available for Python, Java, and C++ code profiling. Currently, async_profiler are used as profilers for Java and austin for Python and C++.
 
 
 ## Overview
@@ -33,11 +33,11 @@ This environment simulates real-world code profiling tasks where agents must:
 
 ## Environment Note
 Currently all three code generation environment build-outs happen in the same container along with the runner environment to pack into the same HF Spaces. 
-There is a sample docker-compose included for simulating true multi-agent, multi-environment scenario of different code bases( say of different micr-services of an application) running in their own containers / HF Spaces. A common openenv environment can help coordinate this. 
-This is especially useful for large scale porting or migration exercises. 
+There is a sample docker-compose included for simulating true multi-agent, multi-environment scenario of different code bases( say of different micro-services of an application) running in their own containers / HF Spaces. A common openenv environment can help coordinate this. 
+This is especially useful for large scale application porting or migration exercises driven by coding agents. 
 
 ## Tasks
-
+For this hackathon, a simulation of potentially easy, medium and hard scenarios have been identified. Here are three sample scenarios 
 ### Easy: String Concatenation (Python)
 **Task ID:** `python-string-concat-easy`
 

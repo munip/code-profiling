@@ -660,19 +660,18 @@ class JavaProfiler:
 
 
 class CppProfiler:
-    """Profiler for C++ code using austin frame sampler."""
+    """Profiler for C++ code using Linux perf."""
 
     @staticmethod
-    def profile_with_austin(
-        binary_path: str = None, duration: int = 5
-    ) -> ProfileResult:
+    def profile_with_perf(binary_path: str = None, duration: int = 5) -> ProfileResult:
         """
-        Profile C++ binary using austin frame sampler.
+        Profile C++ binary using Linux perf.
 
-        Austin works similarly to Python - it samples stack traces
-        at regular intervals from a running process.
+        Perf is a sampling profiler that uses hardware performance counters
+        to sample stack traces at regular intervals.
 
-        Usage: austin -x <duration> -o <output.prof> <binary>
+        Usage: perf record -g -o <output.perf> -- <binary>
+               perf report -i <output.perf> --stdio
         """
         if binary_path is None:
             binary_path = CPP_BINARY
@@ -688,59 +687,60 @@ class CppProfiler:
                 )
             binary_path = CPP_BINARY
 
-        with tempfile.NamedTemporaryFile(suffix=".prof", delete=False) as f:
-            output_file = f.name
+        with tempfile.NamedTemporaryFile(suffix=".perf", delete=False) as f:
+            perf_data_file = f.name
 
         try:
             result = subprocess.run(
-                ["austin", "-x", str(duration), "-o", output_file, binary_path],
+                ["perf", "record", "-g", "-o", perf_data_file, "--", binary_path],
                 capture_output=True,
                 timeout=duration + 30,
             )
 
-            if result.returncode == 0 and os.path.exists(output_file):
-                with open(output_file) as f:
-                    output = f.read()
-
-                hotspots = CppProfiler._parse_austin_output(output)
-
-                return ProfileResult(
-                    success=True,
-                    execution_time_ms=duration * 1000.0,
-                    hotspots=hotspots,
-                    output=output[:1000],
+            if result.returncode == 0 and os.path.exists(perf_data_file):
+                report_result = subprocess.run(
+                    [
+                        "perf",
+                        "report",
+                        "-i",
+                        perf_data_file,
+                        "--stdio",
+                        "-n",
+                        "-g",
+                        "none",
+                    ],
+                    capture_output=True,
+                    timeout=30,
                 )
-            else:
-                try:
-                    error_msg = (
-                        result.stderr.decode("utf-8", errors="replace")
-                        if result.stderr
-                        else "austin failed"
+
+                if report_result.returncode == 0:
+                    output = report_result.stdout.decode("utf-8", errors="replace")
+                    hotspots = CppProfiler._parse_perf_output(output)
+                    return ProfileResult(
+                        success=True,
+                        execution_time_ms=duration * 1000.0,
+                        hotspots=hotspots,
+                        output=output[:1000],
                     )
-                except Exception:
-                    error_msg = "austin failed with encoding error"
-                logger.warning(
-                    f"austin failed: {error_msg}, measuring actual C++ execution time"
-                )
-                avg_time = measure_console_execution_time(
-                    [binary_path], warmup_runs=1, measure_runs=3
-                )
-                return CppProfiler._fallback_profile(
-                    avg_time if avg_time > 0 else duration * 1000.0
-                )
 
-        except subprocess.TimeoutExpired:
+            logger.warning("perf failed, falling back to simulated")
             avg_time = measure_console_execution_time(
                 [binary_path], warmup_runs=1, measure_runs=3
             )
-            return ProfileResult(
-                success=False,
-                execution_time_ms=avg_time if avg_time > 0 else duration * 1000.0,
-                hotspots=[],
-                error="Profile timed out",
+            return CppProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
+            )
+
+        except subprocess.TimeoutExpired:
+            logger.warning("perf timed out, measuring actual C++ execution time")
+            avg_time = measure_console_execution_time(
+                [binary_path], warmup_runs=1, measure_runs=3
+            )
+            return CppProfiler._fallback_profile(
+                avg_time if avg_time > 0 else duration * 1000.0
             )
         except FileNotFoundError:
-            logger.warning("austin not found, measuring actual C++ execution time")
+            logger.warning("perf not found, measuring actual C++ execution time")
             avg_time = measure_console_execution_time(
                 [binary_path], warmup_runs=1, measure_runs=3
             )
@@ -748,7 +748,7 @@ class CppProfiler:
                 avg_time if avg_time > 0 else duration * 1000.0
             )
         except Exception as e:
-            logger.warning(f"austin error: {e}, measuring actual C++ execution time")
+            logger.warning(f"perf error: {e}, measuring actual C++ execution time")
             avg_time = measure_console_execution_time(
                 [binary_path], warmup_runs=1, measure_runs=3
             )
@@ -756,8 +756,8 @@ class CppProfiler:
                 avg_time if avg_time > 0 else duration * 1000.0
             )
         finally:
-            if os.path.exists(output_file):
-                os.unlink(output_file)
+            if os.path.exists(perf_data_file):
+                os.unlink(perf_data_file)
 
     @staticmethod
     def _compile_cpp() -> bool:
@@ -768,7 +768,7 @@ class CppProfiler:
             os.makedirs(build_dir, exist_ok=True)
 
             result = subprocess.run(
-                ["g++", "-O0", "-o", CPP_BINARY, main_cpp],
+                ["g++", "-g", "-O0", "-o", CPP_BINARY, main_cpp],
                 capture_output=True,
                 timeout=60,
             )
@@ -778,77 +778,70 @@ class CppProfiler:
             return False
 
     @staticmethod
-    def _parse_austin_output(output: str) -> List[Hotspot]:
-        """Parse austin collapsed stack format for C++."""
+    def _parse_perf_output(output: str) -> List[Hotspot]:
+        """Parse perf report text output."""
         hotspots = []
         seen_funcs = {}
 
         for line in output.split("\n"):
             line = line.strip()
-            if not line or line.startswith("#"):
+            if not line:
                 continue
 
-            # Extract metric from brackets [metric]
-            if "[" in line and "]" in line:
-                metric_str = line[line.rfind("[") + 1 : line.rfind("]")]
-                try:
-                    time_us = float(metric_str)
-                except ValueError:
-                    time_us = 0.0
-                stack_part = line[: line.rfind("[")].rstrip(";")
-            else:
-                parts = line.split(";")
-                if len(parts) >= 2:
-                    try:
-                        time_us = float(parts[-1])
-                        stack_part = ";".join(parts[:-1])
-                    except ValueError:
-                        continue
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+
+            try:
+                if parts[0].replace(".", "").replace("%", "").isdigit():
+                    pass
+                elif any(c.isdigit() for c in parts[0]):
+                    pass
                 else:
                     continue
-
-            if not stack_part:
+            except (ValueError, IndexError):
                 continue
 
-            frames = [f.strip() for f in stack_part.split(";") if f.strip()]
-            if not frames:
-                continue
+            try:
+                func_name = None
+                file_path = "main.cpp"
+                self_time = 0.0
 
-            # Get innermost C++ function
-            func_name = None
-            file_path = "main.cpp"
-            for frame in reversed(frames):
-                if any(skip in frame for skip in ("libc", "start", "main")):
+                if "[" in line and "]" in line:
+                    idx = line.find("]")
+                    after = line[idx + 1 :].strip()
+                    func_parts = after.split()
+                    if func_parts:
+                        func_name = func_parts[0].split("(")[0]
+                        if "(" in func_parts[0]:
+                            file_path = func_parts[0].split("(")[1].rstrip(")")
+                elif any(c.isdigit() for c in parts[0]):
+                    for i, part in enumerate(parts):
+                        if ":" in part and not part.startswith(":"):
+                            func_part = part.rstrip(":")
+                            if func_part:
+                                func_name = func_part
+                                file_path = func_part
+                                break
+
+                if not func_name:
                     continue
-                if ":" in frame:
-                    func_name = frame.split(":")[0]
-                    try:
-                        line_num = int(frame.split(":")[-1])
-                    except ValueError:
-                        line_num = None
-                    file_path = func_name
-                    if line_num:
-                        file_path = f"{func_name}:{line_num}"
+
+                if func_name in seen_funcs:
+                    seen_funcs[func_name].call_count += 1
+                    seen_funcs[func_name].self_time_ms += 1.0
                 else:
-                    func_name = frame
-                break
-
-            if not func_name:
-                func_name = frames[-1] if frames else "unknown"
-
-            if func_name in seen_funcs:
-                seen_funcs[func_name].call_count += 1
-                seen_funcs[func_name].self_time_ms += time_us / 1000.0
-            else:
-                seen_funcs[func_name] = Hotspot(
-                    function_name=func_name,
-                    file_path=file_path,
-                    line_number=None,
-                    self_time_ms=time_us / 1000.0,
-                    total_time_ms=time_us / 1000.0,
-                    call_count=1,
-                    percentage=0.0,
-                )
+                    seen_funcs[func_name] = Hotspot(
+                        function_name=func_name,
+                        file_path=file_path,
+                        line_number=None,
+                        self_time_ms=1.0,
+                        total_time_ms=1.0,
+                        call_count=1,
+                        percentage=0.0,
+                    )
+            except (ValueError, IndexError):
+                continue
 
         hotspots = list(seen_funcs.values())
         if not hotspots:
@@ -870,7 +863,7 @@ class CppProfiler:
             success=True,
             execution_time_ms=execution_time_ms,
             hotspots=hotspots,
-            output="(simulated - austin not available)",
+            output="(simulated - perf not available)",
         )
 
     @staticmethod
@@ -970,7 +963,7 @@ class ProfileRunner:
             return JavaProfiler.profile_request(duration=duration)
         elif language == "cpp":
             if use_real_profiler:
-                return CppProfiler.profile_with_austin(duration=duration)
+                return CppProfiler.profile_with_perf(duration=duration)
             return CppProfiler.profile_request(duration=duration)
         else:
             return ProfileResult(

@@ -21,6 +21,7 @@ This environment simulates real-world code profiling tasks where AI agents must:
 4. **Measure** improvement with graded rewards (0.0-1.0)
 
 The environment is designed for the OpenEnv hackathon and follows the full OpenEnv specification with typed models, step()/reset()/state() API, and task-based grading.
+Check README_sdk.md REDME_environment.md for further details
 
 ## Architecture
 

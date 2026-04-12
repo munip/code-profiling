@@ -124,7 +124,7 @@ Hotspot(
 
 ## Reward System
 
-Rewards are **normalized scores (0.0-1.0)** based on:
+Rewards are **normalized scores between (0-1)** based on:
 
 | Metric | Description | Weight |
 |--------|-------------|--------|
@@ -132,6 +132,7 @@ Rewards are **normalized scores (0.0-1.0)** based on:
 | Memory Usage | Reduction from baseline | Varies by task |
 | Hotspot Reduction | Lower hotspot % = better | Varies by task |
 | Iteration Bonus | Extra points for quick solutions | +0.02 per remaining step |
+Note: While initially the reward was 0 to 1.0, the grading tool complained about rewards to be strictly between 0 and 1 in phase 2 and hence adjusted it to be between 0.01 and 0.99 to get past phase 2 checks
 
 **Passing threshold:** Score ≥ 0.7
 
