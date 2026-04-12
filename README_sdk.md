@@ -19,7 +19,7 @@ model_index:
 
 # Code Profiler Environment
 
-An OpenEnv RL environment for iterative code profiling and performance optimization of coding agent/tools generated code. Agents with the help of OpenEnv rewards feedback learn to identify and fix performance bottlenecks based on code profiler runs. To start with support is available for Python, Java, and C++ code profiling. Currently, async_profiler are used as profilers for Java and austin for Python and perf for C++.
+An OpenEnv RL environment for iterative code profiling and performance optimization of coding agent/tools generated code. Agents with the help of OpenEnv rewards feedback learn to identify and fix performance bottlenecks based on code profiler runs. To start with support is available for Python, Java, and C++ code profiling. Currently, async_profiler are used as profilers for Java and austin for Python and perf for C++. perf tool is the default linux tool taht comes with most distros. Assuming it exists in the distro used for testing
 
 
 ## Overview
