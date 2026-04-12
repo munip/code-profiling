@@ -357,7 +357,13 @@ async def startup_event():
 
             # Find the austin binary
             found = False
-            for pattern in ["/tmp/austin", "/tmp/austin-*", "/tmp/bin/austin"]:
+            search_patterns = [
+                "/tmp/austin-*/bin/austin",
+                "/tmp/austin/bin/austin",
+                "/tmp/austin",
+                "/tmp/austin-*",
+            ]
+            for pattern in search_patterns:
                 for path in glob.glob(pattern):
                     p = Path(path)
                     if p.is_file():
@@ -370,6 +376,18 @@ async def startup_event():
                         logger.info("austin copied to /usr/local/bin/austin")
                         found = True
                         break
+                    elif p.is_dir():
+                        bin_path = p / "bin" / "austin"
+                        if bin_path.exists():
+                            logger.info(f"Found austin at: {bin_path}")
+                            import shutil
+
+                            Path("/usr/local/bin").mkdir(exist_ok=True)
+                            shutil.copy(bin_path, "/usr/local/bin/austin")
+                            Path("/usr/local/bin/austin").chmod(0o755)
+                            logger.info("austin copied to /usr/local/bin/austin")
+                            found = True
+                            break
                 if found:
                     break
 
